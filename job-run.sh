@@ -15,16 +15,15 @@ module load cuda/12.1
 
 echo "working"
 
-source /cluster/courses/3dv/data/team-4/paper_imported_code/DROID-SLAM/env-droid/bin/activate
+source /home/tducrey/env-cil/bin/activate
 
-cd /cluster/courses/3dv/data/team-4/paper_imported_code/DROID-SLAM
+cd /home/tducrey/CIL_RoadSegementation
 
 #### put python commands here
 
 # ./tools/validate_tartanair.sh --plot_curve
 
-TARTANAIR_PATH=datasets/TartanAir
-python evaluation_scripts/validate_tartanair.py --datapath=$TARTANAIR_PATH --reconstruction_path P001_reconstruction --weights=droid.pth --disable_vis --buffer=650 $@
+python main.py
 
 
 echo "finished"
