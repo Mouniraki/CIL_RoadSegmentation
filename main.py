@@ -12,7 +12,6 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.notebook import tqdm
 
-from .utils import load_all_from_path
 from augmentation import *
 from mask_to_submission import *
 from metrics import *
@@ -23,10 +22,15 @@ PATCH_SIZE = 16  # pixels per side of square patches
 VAL_SIZE = 10  # size of the validation set (number of images)
 CUTOFF = 0.25  # minimum average brightness for a mask patch to be 
 
-ROOT_PATH = ""
+ROOT_PATH = "/home/xmarchon/CIL_RoadSegmentation"
 test_path = "test"
 
+"""
+Data Augmentation
+"""
+run_augmentation_pipeline(5)
 
+"""
 images = load_all_from_path(os.path.join(ROOT_PATH, 'training', 'images'))[:, :, :, :3]
 masks = load_all_from_path(os.path.join(ROOT_PATH, 'training', 'groundtruth'))
 
@@ -41,7 +45,7 @@ train_patches, train_labels = image_to_patches(train_images, train_masks)
 val_patches, val_labels = image_to_patches(val_images, val_masks)
 
 # the first image is broken up in the first 25*25 patches
-show_patched_image(train_patches[:25*25], train_labels[:25*25])
+#show_patched_image(train_patches[:25*25], train_labels[:25*25])
 
 
 test_path = os.path.join(ROOT_PATH, 'training', 'images')
@@ -134,3 +138,4 @@ for i in range(0,1):
     show_patched_image(train_patches_for_metric_1[i*25*25:(i+1)*25*25], train_labels_for_metric[i*25*25:(i+1)*25*25], figsize=(4, 4))
     show_patched_image(train_patches_for_metric_2[i*25*25:(i+1)*25*25], train_true_label[i*25*25:(i+1)*25*25], figsize=(4, 4))
     print("F1 score for frame %s : %s" % (i, f1_score(train_labels_for_metric[i*25*25:(i+1)*25*25], train_true_label[i*25*25:(i+1)*25*25])))
+"""
