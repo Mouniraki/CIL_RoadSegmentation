@@ -105,7 +105,7 @@ for radius in range(0, 10):
     print("Total F1 score with patch postprocessing radius %s : %s" % (
     radius, f1_score(train_labels_for_metric_post_processing, train_true_label)))
 
-for i in range(0, 1):
+for i in range(0, 40):
     show_patched_image(train_patches_for_metric_1[i * 25 * 25:(i + 1) * 25 * 25],
                        train_labels_for_metric[i * 25 * 25:(i + 1) * 25 * 25])
     show_patched_image(train_patches_for_metric_2[i * 25 * 25:(i + 1) * 25 * 25],
