@@ -47,7 +47,7 @@ model = UNet().to(device)
 loss_fn = nn.BCELoss()
 metric_fns = {'acc': accuracy_fn, 'patch_acc': patch_accuracy_fn}
 optimizer = torch.optim.Adam(model.parameters())
-n_epochs = 15  # default : 5
+n_epochs = 5  # default : 5
 train(data.train_dataloader, data.val_dataloader, model, loss_fn, metric_fns, optimizer, n_epochs)
 
 # predict on test set
@@ -101,7 +101,7 @@ train_patches_for_metric_2, train_true_label = image_to_patches(images_train_for
 print("Total F1 score without patch postprocessing   : %s" % (f1_score(train_labels_for_metric, train_true_label)))
 
 
-
+exit()
 #for radius in range(0, 10):
 #    train_labels_for_metric_post_processing = patch_postprocessing(train_labels_for_metric, algorithm='mask_connected_though_border_radius', radius=radius)
 #    print("Total F1 score with patch postprocessing radius %s : %s" % (
