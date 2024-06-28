@@ -148,7 +148,7 @@ If the shortest distance between two group is bigger than a threshold and the gr
 def connect_road(model_out_mask, params):
     max_dist = params['max_dist']
     min_group_size = params['min_group_size']
-    assert min_group_size >=0
+    assert min_group_size >=1 and max_dist>=1
     mask_connect_road = model_out_mask.copy()
     road_networks = {} # (w,h) -> group_id
 

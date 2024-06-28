@@ -101,7 +101,6 @@ train_patches_for_metric_2, train_true_label = image_to_patches(images_train_for
 print("Total F1 score without patch postprocessing   : %s" % (f1_score(train_labels_for_metric, train_true_label)))
 
 
-exit()
 #for radius in range(0, 10):
 #    train_labels_for_metric_post_processing = patch_postprocessing(train_labels_for_metric, algorithm='mask_connected_though_border_radius', radius=radius)
 #    print("Total F1 score with patch postprocessing radius %s : %s" % (
@@ -124,8 +123,8 @@ for radius in range(0, 15, 3):
 #print(f"Total F1 score with patch postprocessing "
 #      f"extend_path_to_closest : {f1_score(train_labels_for_metric_post_processing, train_true_label)}")
 #connect_road
-for min_group_size in range(0, 12, 4):
-    for max_dist in range(0,25, 5):
+for min_group_size in range(1, 12, 4):
+    for max_dist in range(1,25, 5):
         algo_and_params = algos_and_params['connect_road']
         algo_and_params['min_group_size'], algo_and_params['max_dist'] = min_group_size, max_dist
         train_labels_for_metric_post_processing = patch_postprocessing(train_labels_for_metric, algo_and_params)
