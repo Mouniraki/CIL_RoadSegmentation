@@ -9,7 +9,7 @@ from tqdm import tqdm
 from dataset import Data
 from metrics import accuracy_fn, patch_accuracy_fn
 from models import UNet
-from post_processing import patch_postprocessing
+from post_processing import patch_postprocessing, algos_and_params
 from utils import show_first_n, image_to_patches, train, create_submission, np_to_tensor, \
     show_patched_image
 
@@ -100,12 +100,47 @@ train_patches_for_metric_2, train_true_label = image_to_patches(images_train_for
 
 print("Total F1 score without patch postprocessing   : %s" % (f1_score(train_labels_for_metric, train_true_label)))
 
-for radius in range(0, 10):
-    train_labels_for_metric_post_processing = patch_postprocessing(train_labels_for_metric, radius=radius)
-    print("Total F1 score with patch postprocessing radius %s : %s" % (
-    radius, f1_score(train_labels_for_metric_post_processing, train_true_label)))
 
-for i in range(0, 40):
+
+#for radius in range(0, 10):
+#    train_labels_for_metric_post_processing = patch_postprocessing(train_labels_for_metric, algorithm='mask_connected_though_border_radius', radius=radius)
+#    print("Total F1 score with patch postprocessing radius %s : %s" % (
+#    radius, f1_score(train_labels_for_metric_post_processing, train_true_label)))
+
+
+
+# Test postprocessing
+#mask_connected_though_border_radius
+for radius in range(0, 15, 3):
+        algo_and_params = algos_and_params['mask_connected_though_border_radius']
+        algo_and_params['radius'] = radius
+        train_labels_for_metric_post_processing = patch_postprocessing(train_labels_for_metric, algo_and_params)
+        print(f"Total F1 score with patch postprocessing "
+              f"mask_connected_though_border_radius(radius={radius}) : {f1_score(train_labels_for_metric_post_processing, train_true_label)}")
+
+#extend_path_to_closest
+#algo_and_params = algos_and_params['extend_path_to_closest']
+#train_labels_for_metric_post_processing = patch_postprocessing(train_labels_for_metric, algo_and_params)
+#print(f"Total F1 score with patch postprocessing "
+#      f"extend_path_to_closest : {f1_score(train_labels_for_metric_post_processing, train_true_label)}")
+#connect_road
+for min_group_size in range(0, 12, 4):
+    for max_dist in range(0,25, 5):
+        algo_and_params = algos_and_params['connect_road']
+        algo_and_params['min_group_size'], algo_and_params['max_dist'] = min_group_size, max_dist
+        train_labels_for_metric_post_processing = patch_postprocessing(train_labels_for_metric, algo_and_params)
+        print(f"Total F1 score with patch postprocessing "
+              f"connect_road(min_group_size={min_group_size}, "
+              f"max_dist={max_dist}) : {f1_score(train_labels_for_metric_post_processing, train_true_label)}")
+
+
+
+
+
+
+for i in range(0, 3):
+    show_patched_image(train_patches_for_metric_1[i * 25 * 25:(i + 1) * 25 * 25],
+                       train_labels_for_metric_post_processing[i * 25 * 25:(i + 1) * 25 * 25])
     show_patched_image(train_patches_for_metric_1[i * 25 * 25:(i + 1) * 25 * 25],
                        train_labels_for_metric[i * 25 * 25:(i + 1) * 25 * 25])
     show_patched_image(train_patches_for_metric_2[i * 25 * 25:(i + 1) * 25 * 25],

@@ -28,6 +28,21 @@ def show_first_n(imgs, masks, n=5):
         axs[1, i].set_axis_off()
     plt.show()
 
+
+'''
+TODO not complete
+'''
+def show_n_masks(img, masks_dict):
+    imgs_to_draw = len(masks_dict)
+    fig, axs = plt.subplots(1, imgs_to_draw, figsize=(18.5, 6))
+    i = 0
+    for title, mask in masks_dict.items():
+        axs[i].imshow(img)
+        axs[i].set_title(f'{title}')
+        axs[i].set_axis_off()
+        i += 1
+
+
 def image_to_patches(images, patch_size=16, cutoff=0.25, masks=None):
     # takes in a 4D np.array containing images and (optionally) a 4D np.array containing the segmentation masks
     # returns a 4D np.array with an ordered sequence of patches extracted from the image and (optionally) a np.array containing labels
