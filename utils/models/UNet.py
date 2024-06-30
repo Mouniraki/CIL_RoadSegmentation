@@ -16,7 +16,7 @@ class Block(nn.Module):
     def forward(self, x):
         return self.block(x)
 
-
+# Implements UNet (following the scheme described in the paper)
 class UNet(nn.Module):
     def __init__(self, channels=(3,64,128,256,512,1024)):
         super(UNet, self).__init__()
@@ -25,7 +25,7 @@ class UNet(nn.Module):
 
         # Encoder blocks (using the Block class)
         self.enc_blocks = nn.ModuleList([
-            Block(in_ch, out_ch) for in_ch, out_ch in zip(enc_chs[:-1], enc_chs[:1])
+            Block(in_ch, out_ch) for in_ch, out_ch in zip(enc_chs[:-1], enc_chs[1:])
         ])
         # 2x2 max pooling (down-sampling the data)
         self.pool = nn.MaxPool2d(kernel_size=2)
