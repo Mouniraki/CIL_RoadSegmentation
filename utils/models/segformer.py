@@ -3,10 +3,10 @@ from torch import nn
 from transformers import SegformerConfig, SegformerForSemanticSegmentation
 
 class SegFormer(nn.Module):
-    def __init__(self, labels: list[str], checkpoint: str = 'nvidia/mit-b0'):
+    def __init__(self, non_void_labels: list[str], checkpoint: str = 'nvidia/mit-b0'):
         super(SegFormer, self).__init__()
         self.__checkpoint = checkpoint
-        self.__labels = labels
+        self.__labels = non_void_labels
 
         self.__model = SegformerForSemanticSegmentation.from_pretrained(self.__checkpoint, 
                                                              num_labels=len(self.__labels), 
