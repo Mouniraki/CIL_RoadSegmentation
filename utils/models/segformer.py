@@ -1,9 +1,10 @@
 from torch import nn
-from transformers import SegformerConfig, SegformerModel
+from transformers import SegformerConfig, SegformerForSemanticSegmentation
 
 class SegFormer(nn.Module):
     def __init__(self):
         super(SegFormer, self).__init__()
+
         self.config = SegformerConfig(
             num_channels=3,
             num_encoder_blocks=4,
@@ -26,4 +27,4 @@ class SegFormer(nn.Module):
         )
 
     def forward(self, x):
-        return SegformerModel(config=self.config)(x)
+        return SegformerForSemanticSegmentation(config=self.config)(x)
