@@ -2,12 +2,21 @@ import os
 import torch
 from torch.utils.data import Dataset
 from torchvision.io import read_image
+from torchvision.transforms.v2 import Resize
 
 class ImageDataset(Dataset):
-    def __init__(self, for_train: bool, images_dir: str, masks_dir: str | None = None, use_patches: bool = False, patch_size: int=16, cutoff: float=0.25):
+    def __init__(self, 
+                 for_train: bool, 
+                 images_dir: str, 
+                 masks_dir: str | None = None, 
+                 img_size: tuple[int, int] = (400, 400), 
+                 use_patches: bool = False, 
+                 patch_size: int=16, 
+                 cutoff: float=0.25):
         self.for_train = for_train
         self.images_dir = images_dir
         self.masks_dir = masks_dir
+        self.desired_img_h, self.desired_img_w = img_size
         self.use_patches = use_patches
         self.patch_size = patch_size
         self.cutoff = cutoff
@@ -23,12 +32,20 @@ class ImageDataset(Dataset):
         img_path = os.path.join(self.images_dir, filename)
 
         # Loading an image & splitting it into patches (IMAGES HAVE 4 CHANNELS ORIGINALLY (r,g,b, alpha), PICK ONLY THE FIRST 3!)
-        image = read_image(img_path)[:3,:,:] / 255 # (channels, height, width) with values as floating points between 0 and 1
+        image = read_image(img_path)[:3,:,:] # (channels, height, width) with values as floating points between 0 and 1
+        _, h, w = image.shape
+        if self.desired_img_h != h or self.desired_img_w != w:
+            # Resize the image
+            image = Resize(size=(self.desired_img_h, self.desired_img_w)).forward(image)
+        image = image / 255
 
         # Handling the case of the mask
         if self.masks_dir != None:
             mask_path = os.path.join(self.masks_dir, filename)
-            mask = read_image(mask_path) / 255
+            mask = read_image(mask_path)
+            if self.desired_img_h != h or self.desired_img_w != w:
+                mask = Resize(size=(self.desired_img_h // 4, self.desired_img_w // 4)).forward(mask) # Output of SegFormer is a mask of dimensions H//4 x W//4
+            mask = mask / 255
         else:
             mask = None
         
@@ -39,43 +56,6 @@ class ImageDataset(Dataset):
             labels = mask
 
         return image, labels if labels != None else image
-        # else:
-        #     if self.masks_dir != None:
-        #         return 
-
-        # if self.masks_dir != None:
-        #     mask_path = os.path.join(self.masks_dir, filename)
-        #     mask = read_image(mask_path)
-        #     if self.use_patches:
-        #         mask = self.__split_in_patches(img=mask)
-        #         labels = torch.mean(mask, (0, -1, -2), dtype=torch.float32) > self.cutoff
-        #         labels = labels.reshape(-1)
-        #     else:
-        #         labels = mask / 255 # Normalize everything between 0 and 1
-        # else:
-
-        
-
-        # if self.use_patches:
-        #     img_patches = self.__split_in_patches(img=image).reshape(3, -1, self.patch_size, self.patch_size)
-
-        #     # Loading a mask, splitting it into patches and creating labels for each image patch
-        #     if self.masks_dir != None:
-        #         mask_path = os.path.join(self.masks_dir, filename)
-        #         mask = read_image(mask_path).reshape((-1, h_patches, self.patch_size, w_patches, self.patch_size))
-        #         mask = mask.moveaxis(2, 3)
-        #         labels = torch.mean(mask, (0, -1, -2), dtype=torch.float32) > self.cutoff
-        #         labels = labels.reshape(-1)
-        #         return img_patches, labels
-        #     else:
-        #         return img_patches
-        # else:
-        #     if self.masks_dir != None:
-        #         mask_path = os.path.join(self.masks_dir, filename)
-        #         labels = read_image(mask_path) / 255
-        #         return image, labels
-        #     else:
-        #         return image
     
     def __split_in_patches(self, img: torch.Tensor):
         _, h, w = img.shape
