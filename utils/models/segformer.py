@@ -1,30 +1,22 @@
+import torch
 from torch import nn
 from transformers import SegformerConfig, SegformerForSemanticSegmentation
 
 class SegFormer(nn.Module):
-    def __init__(self):
+    def __init__(self, labels: list[str], checkpoint: str = 'nvidia/mit-b0'):
         super(SegFormer, self).__init__()
+        self.__checkpoint = checkpoint
+        self.__labels = labels
 
-        self.config = SegformerConfig(
-            num_channels=3,
-            num_encoder_blocks=4,
-            depths=[2, 2, 2, 2],
-            sr_ratios=[8, 4, 2, 1],
-            hidden_sizes=[32, 64, 160, 256],
-            patch_sizes=[7, 3, 3, 3],
-            strides=[4, 2, 2, 2],
-            num_attention_heads=[1, 2, 5, 8],
-            mlp_ratios=[4, 4, 4, 4],
-            hidden_act="gelu",
-            hidden_dropout_prob=0.0,
-            attention_probs_dropout_prob=0.0,
-            classifier_dropout_prob=0.1,
-            initializer_range=0.02,
-            drop_path_rate=0.1,
-            layer_norm_eps=1e-6,
-            decoder_hidden_size=256,
-            semantic_loss_ignore_index=255
-        )
+        self.__model = SegformerForSemanticSegmentation.from_pretrained(self.__checkpoint, 
+                                                             num_labels=len(self.__labels), 
+                                                             id2label={i: self.__labels[i] for i in range(len(self.__labels))}, 
+                                                             label2id={self.__labels[i]: i for i in range(len(self.__labels))})
 
     def forward(self, x):
-        return SegformerForSemanticSegmentation(config=self.config)(x)
+        # Output shape is (N_LABELS, H//4, W//4)
+        _, _, h, w = x.shape # First dimension is the batch size!
+        x = self.__model(x).logits
+        # Interpolate the logits to have a properly sized segmentation map
+        x = nn.functional.interpolate(x, size=(h, w), mode='bilinear', align_corners=False)
+        return torch.sigmoid(x)

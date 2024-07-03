@@ -12,6 +12,7 @@ from torchvision.transforms.v2 import Resize
 # Importing the dataset & models
 from utils.loaders.image_dataset import ImageDataset
 from utils.models.unet import UNet
+from utils.models.segformer import SegFormer
 from transformers import SegformerConfig, SegformerForSemanticSegmentation
 
 # Importing plot & metric utilities
@@ -38,13 +39,7 @@ def main():
 
     # Setting up the model, loss function and optimizer
     # model = UNet().to(DEVICE)
-    id2label = {0: 'road'}
-    id2color = {0: [255, 255, 255]} # Road is completely white in our case
-    label2id = {'road': 0}
-    model = SegformerForSemanticSegmentation.from_pretrained('nvidia/mit-b0', 
-                                                             num_labels=1, 
-                                                             id2label=id2label, 
-                                                             label2id=label2id)
+    model = SegFormer(labels=['road'], checkpoint='nvidia/mit-b0')
     loss_fn = torch.nn.BCELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.00006)
 
@@ -58,7 +53,7 @@ def main():
         images_dir = os.path.abspath('dataset/training/images/'),
         masks_dir = os.path.abspath('dataset/training/groundtruth/'),
         use_patches=False,
-        img_size=(512, 512)
+        # img_size=(512, 512)
     )
 
     # Performing a train/validation split
@@ -78,10 +73,6 @@ def main():
             y = y.to(DEVICE)
             optimizer.zero_grad() # Zero-out gradients
             y_hat = model(x) # Forward pass
-
-            # TODO: MODIFY THIS TO MAKE IT GENERALIZABLE
-            y_hat = torch.sigmoid(y_hat.logits)
-
             loss = loss_fn(y_hat, y)
             writer.add_scalar("Loss/train", loss.item(), epoch)
             loss.backward() # Backward pass
@@ -96,7 +87,6 @@ def main():
                 x = x.to(DEVICE)
                 y = y.to(DEVICE)
                 y_hat = model(x) # Perform forward pass
-                y_hat = torch.sigmoid(y_hat.logits)
                 loss = loss_fn(y_hat, y)
                 writer.add_scalar("Loss/eval", loss.item(), epoch)
                 images.append(x)
@@ -121,7 +111,8 @@ def main():
     test_dataset = ImageDataset(
         for_train=False,
         images_dir = os.path.abspath('dataset/test/images/'),
-        img_size = (512, 512))
+        # img_size = (512, 512)
+    )
     # We don't shuffle to keep the original data ordering
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=N_WORKERS, shuffle=False)
 
@@ -134,13 +125,11 @@ def main():
         img_idx = 144 # Test images start at index 144
         for x, _ in test_dataloader:
             x = x.to(DEVICE)
-            pred = model(x)
-            pred = torch.sigmoid(pred.logits.detach().cpu())
+            pred = model(x).detach().cpu()
             # Add channels to end up with RGB tensors, and save the predicted masks on disk
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
             for t in pred:
                 t = (t * 255).type(torch.uint8) # Rescale everything in the 0-255 range to generate channels for images
-                t = Resize(size=(400, 400)).forward(t) # TODO: MAKE THIS GENERALIZABLE
                 write_png(input=t, filename=f'predictions/{curr_date}/satimage_{img_idx}.png')
                 img_idx += 1
 
