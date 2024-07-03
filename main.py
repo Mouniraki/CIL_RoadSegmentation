@@ -39,7 +39,7 @@ def main():
 
     # Setting up the model, loss function and optimizer
     # model = UNet().to(DEVICE)
-    model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b1').to(DEVICE)
+    model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b3').to(DEVICE)
     loss_fn = torch.nn.BCELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.00006)
 

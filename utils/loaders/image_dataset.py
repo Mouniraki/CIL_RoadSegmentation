@@ -9,7 +9,7 @@ class ImageDataset(Dataset):
                  for_train: bool, 
                  images_dir: str, 
                  masks_dir: str | None = None, 
-                 img_size: tuple[int, int] = (400, 400), 
+                 img_size: tuple[int, int] = (400, 400), # Default size is (400, 400), otherwise we resize
                  use_patches: bool = False, 
                  patch_size: int=16, 
                  cutoff: float=0.25):
@@ -44,7 +44,7 @@ class ImageDataset(Dataset):
             mask_path = os.path.join(self.masks_dir, filename)
             mask = read_image(mask_path)
             if self.desired_img_h != h or self.desired_img_w != w:
-                mask = Resize(size=(self.desired_img_h // 4, self.desired_img_w // 4)).forward(mask) # Output of SegFormer is a mask of dimensions H//4 x W//4
+                mask = Resize(size=(self.desired_img_h, self.desired_img_w)).forward(mask)
             mask = mask / 255
         else:
             mask = None
