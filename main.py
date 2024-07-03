@@ -140,7 +140,7 @@ def main():
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
             for t in pred:
                 t = (t * 255).type(torch.uint8) # Rescale everything in the 0-255 range to generate channels for images
-                pred = Resize(size=(400, 400)).forward(pred) # TODO: MAKE THIS GENERALIZABLE
+                t = Resize(size=(400, 400)).forward(t) # TODO: MAKE THIS GENERALIZABLE
                 write_png(input=t, filename=f'predictions/{curr_date}/satimage_{img_idx}.png')
                 img_idx += 1
 
