@@ -7,13 +7,11 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, random_split
 from torchvision.io import write_png
-from torchvision.transforms.v2 import Resize
 
 # Importing the dataset & models
 from utils.loaders.image_dataset import ImageDataset
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
-from transformers import SegformerConfig, SegformerForSemanticSegmentation
 
 # Importing plot & metric utilities
 from utils.plotting import plot_patches, show_val_samples
@@ -28,7 +26,7 @@ CUTOFF = 0.25
 
 TRAIN_SPLIT = 0.8
 BATCH_SIZE = 4
-N_WORKERS = 0 # Base is 4, set to 0 if it causes errors
+N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
 N_EPOCHS = 5
 
 def main():
