@@ -14,9 +14,8 @@ class SegFormer(nn.Module):
                                                              label2id={self.__labels[i]: i for i in range(len(self.__labels))})
 
     def forward(self, x):
-        # Output shape is (N_LABELS, H//4, W//4)
         _, _, h, w = x.shape # First dimension is the batch size!
         x = self.__model(x).logits
-        # Interpolate the logits to have a properly sized segmentation map
+        # Interpolate the logits to have a properly sized segmentation map (since output of transformer is (N_LABELS, H//4, W//4))
         x = nn.functional.interpolate(x, size=(h, w), mode='bilinear', align_corners=False)
         return torch.sigmoid(x)
