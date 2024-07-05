@@ -17,10 +17,8 @@ def precision_fn(y_hat: torch.Tensor, y: torch.Tensor):
 
     pred_pos = y_hat >= 0.5
 
-    true_pos = torch.logical_and(pred_pos, gt_pos).sum(dim=(-1, -2, -3))
-    false_pos = torch.logical_and(pred_pos, gt_neg).sum(dim=(-1, -2, -3))
-    # print(f"PRECISION_TP:{true_pos}")
-    # print(f"PRECISION_FP:{false_pos}")
+    true_pos = torch.logical_and(pred_pos, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
+    false_pos = torch.logical_and(pred_pos, gt_neg).sum(dim=(-1, -2, -3), dtype=torch.float32)
 
     return (true_pos / (true_pos + false_pos))
 
@@ -31,10 +29,8 @@ def recall_fn(y_hat: torch.Tensor, y: torch.Tensor):
     pred_pos = y_hat >= 0.5
     pred_neg = y_hat < 0.5
 
-    true_pos = torch.logical_and(pred_pos, gt_pos).sum(dim=(-1, -2, -3))
-    false_neg = torch.logical_and(pred_neg, gt_pos).sum(dim=(-1, -2, -3))
-    # print(f"RECALL_TP:{true_pos}")
-    # print(f"RECALL_FN:{false_neg}")
+    true_pos = torch.logical_and(pred_pos, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
+    false_neg = torch.logical_and(pred_neg, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
 
     return (true_pos / (true_pos + false_neg))
 
@@ -52,8 +48,8 @@ def iou_fn(y_hat: torch.Tensor, y: torch.Tensor):
     pred_pos = y_hat >= 0.5
     pred_neg = y_hat < 0.5
 
-    true_pos = torch.logical_and(pred_pos, gt_pos).sum(dim=(-1, -2, -3))
-    false_pos = torch.logical_and(pred_pos, gt_neg).sum(dim=(-1, -2, -3))
-    false_neg = torch.logical_and(pred_neg, gt_pos).sum(dim=(-1, -2, -3))
+    true_pos = torch.logical_and(pred_pos, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
+    false_pos = torch.logical_and(pred_pos, gt_neg).sum(dim=(-1, -2, -3), dtype=torch.float32)
+    false_neg = torch.logical_and(pred_neg, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
 
     return (true_pos / (true_pos + false_pos + false_neg))
