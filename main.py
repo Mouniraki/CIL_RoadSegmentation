@@ -103,6 +103,10 @@ def main():
             f1 = f1_fn(y_hat=predictions, y=ground_truths).mean()
 
             writer.add_scalar(f"Accuracy/eval", patch_acc, epoch)
+            writer.add_scalar(f"Mean IoU/eval", mean_iou, epoch)
+            writer.add_scalar(f"Precision/eval", precision, epoch)
+            writer.add_scalar(f"Recall/eval", recall, epoch)
+            writer.add_scalar(f"F1 score/eval", f1, epoch)
 
             print(f"Overall patch accuracy: {patch_acc}")
             print(f"Intersection over Union: {mean_iou}")
