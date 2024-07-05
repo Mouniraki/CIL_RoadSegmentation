@@ -16,6 +16,6 @@ class SegFormer(nn.Module):
     def forward(self, x):
         _, _, h, w = x.shape # First dimension is the batch size!
         x = self.__model(x).logits
-        # Interpolate the logits to have a properly sized segmentation map (since output of transformer is (N_LABELS, H//4, W//4))
-        x = nn.functional.interpolate(x, size=(h, w), mode='bilinear', align_corners=False)
+        # Interpolate the logits to have a properly sized segmentation map (since output of transformer is (N_LABELS, H//4, W//4) for each image)
+        x = nn.functional.interpolate(x, size=(h, w), mode='bilinear', align_corners=False) # Default is bilinear with align_corners=False
         return torch.sigmoid(x)
