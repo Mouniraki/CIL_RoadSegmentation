@@ -80,8 +80,6 @@ def main():
         model.eval()
         with torch.no_grad():
             # To compute the overall patch accuracy
-            images, predictions, ground_truths = [], [], []
-
             batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1 = [], [], [], [], []
             for (x, y) in validation_dataloader:
                 x = x.to(DEVICE)
@@ -95,9 +93,6 @@ def main():
                 batch_precision.append(precision_fn(y_hat=y_hat, y=y))
                 batch_recall.append(recall_fn(y_hat=y_hat, y=y))
                 batch_f1.append(f1_fn(y_hat=y_hat, y=y))
-                # images.append(x)
-                # predictions.append(y_hat)
-                # ground_truths.append(y)
             
             # Computing the metrics
             patch_acc = torch.cat(batch_patch_acc, dim=0).mean()
