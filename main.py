@@ -15,7 +15,7 @@ from utils.models.segformer import SegFormer
 
 # Importing plot & metric utilities
 from utils.plotting import plot_patches, show_val_samples
-from utils.metrics import patch_accuracy_fn
+from utils.metrics import patch_accuracy_fn, iou_fn, precision_fn, recall_fn, f1_fn
 
 # To select the proper hardware accelerator
 DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
@@ -26,7 +26,7 @@ CUTOFF = 0.25
 
 TRAIN_SPLIT = 0.8
 BATCH_SIZE = 4
-N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
+N_WORKERS = 0 # Base is 4, set to 0 if it causes errors
 N_EPOCHS = 5
 
 def main():
@@ -36,8 +36,8 @@ def main():
     writer = SummaryWriter(log_dir='tensorboard/')
 
     # Setting up the model, loss function and optimizer
-    # model = UNet().to(DEVICE)
-    model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b3').to(DEVICE)
+    model = UNet().to(DEVICE)
+    # model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b0').to(DEVICE)
     loss_fn = torch.nn.BCELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.00006)
 
@@ -91,21 +91,33 @@ def main():
                 predictions.append(y_hat)
                 ground_truths.append(y)
             
-            images = torch.cat(images, 0)
-            predictions = torch.cat(predictions, 0)
-            ground_truths = torch.cat(ground_truths, 0)
-            patch_acc = patch_accuracy_fn(ground_truths, predictions, patch_size=PATCH_SIZE, cutoff=CUTOFF)
+            images = torch.cat(images, dim=0)
+            predictions = torch.cat(predictions, dim=0)
+            ground_truths = torch.cat(ground_truths, dim=0)
+
+            # Computing the metrics
+            patch_acc = patch_accuracy_fn(y_hat=predictions, y=ground_truths, patch_size=PATCH_SIZE, cutoff=CUTOFF)
+            mean_iou = iou_fn(y_hat=predictions, y=ground_truths).mean()
+            precision = precision_fn(y_hat=predictions, y=ground_truths).mean()
+            recall = recall_fn(y_hat=predictions, y=ground_truths).mean()
+            f1 = f1_fn(y_hat=predictions, y=ground_truths).mean()
+
             writer.add_scalar(f"Accuracy/eval", patch_acc, epoch)
+
             print(f"Overall patch accuracy: {patch_acc}")
+            print(f"Intersection over Union: {mean_iou}")
+            print(f"Precision: {precision}")
+            print(f"Recall: {recall}")
+            print(f"F1 Score: {f1}")
         
         # Optional : display the validation samples used for validation
         show_val_samples(images.detach().cpu(), ground_truths.detach().cpu(), predictions.detach().cpu())
 
 
     #############################
-    # Testing routine
+    # Inference routine
     #############################
-    print("Performing testing")
+    print("Performing inference")
     test_dataset = ImageDataset(
         for_train=False,
         images_dir = os.path.abspath('dataset/test/images/'),
