@@ -8,7 +8,7 @@ def patch_accuracy_fn(y_hat: torch.Tensor, y: torch.Tensor, patch_size: int = 16
     # Only 1 channel for the prediction!
     patches_hat = y_hat.reshape(-1, 1, h_patches, patch_size, w_patches, patch_size).mean((-1, -3)) > cutoff
     patches = y.reshape(-1, 1, h_patches, patch_size, w_patches, patch_size).mean((-1, -3)) > cutoff
-    return (patches == patches_hat).float().mean().item()
+    return (patches == patches_hat).to(torch.float32)
 
 # Computes the Precision metric for a batch of predictions (how many retrieved items are relevant)
 def precision_fn(y_hat: torch.Tensor, y: torch.Tensor):

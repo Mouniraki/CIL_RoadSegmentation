@@ -81,26 +81,30 @@ def main():
         with torch.no_grad():
             # To compute the overall patch accuracy
             images, predictions, ground_truths = [], [], []
+
+            batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1 = [], [], [], [], []
             for (x, y) in validation_dataloader:
                 x = x.to(DEVICE)
                 y = y.to(DEVICE)
                 y_hat = model(x) # Perform forward pass
                 loss = loss_fn(y_hat, y)
                 writer.add_scalar("Loss/eval", loss.item(), epoch)
-                images.append(x)
-                predictions.append(y_hat)
-                ground_truths.append(y)
-            
-            images = torch.cat(images, dim=0)
-            predictions = torch.cat(predictions, dim=0)
-            ground_truths = torch.cat(ground_truths, dim=0)
 
+                batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat, y=y))
+                batch_iou.append(iou_fn(y_hat=y_hat, y=y))
+                batch_precision.append(precision_fn(y_hat=y_hat, y=y))
+                batch_recall.append(recall_fn(y_hat=y_hat, y=y))
+                batch_f1.append(f1_fn(y_hat=y_hat, y=y))
+                # images.append(x)
+                # predictions.append(y_hat)
+                # ground_truths.append(y)
+            
             # Computing the metrics
-            patch_acc = patch_accuracy_fn(y_hat=predictions, y=ground_truths, patch_size=PATCH_SIZE, cutoff=CUTOFF)
-            mean_iou = iou_fn(y_hat=predictions, y=ground_truths).mean()
-            precision = precision_fn(y_hat=predictions, y=ground_truths).mean()
-            recall = recall_fn(y_hat=predictions, y=ground_truths).mean()
-            f1 = f1_fn(y_hat=predictions, y=ground_truths).mean()
+            patch_acc = torch.cat(batch_patch_acc, dim=0).mean()
+            mean_iou = torch.cat(batch_iou, dim=0).mean()
+            precision = torch.cat(batch_precision, dim=0).mean()
+            recall = torch.cat(batch_recall, dim=0).mean()
+            f1 = torch.cat(batch_f1, dim=0).mean()
 
             writer.add_scalar(f"Accuracy/eval", patch_acc, epoch)
             writer.add_scalar(f"Mean IoU/eval", mean_iou, epoch)
@@ -115,7 +119,7 @@ def main():
             print(f"F1 Score: {f1}")
         
         # Optional : display the validation samples used for validation
-        show_val_samples(images.detach().cpu(), ground_truths.detach().cpu(), predictions.detach().cpu())
+        show_val_samples(x.detach().cpu(), y.detach().cpu(), y_hat.detach().cpu())
 
 
     #############################
