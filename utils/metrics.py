@@ -11,34 +11,52 @@ def patch_accuracy_fn(y_hat: torch.Tensor, y: torch.Tensor, patch_size: int = 16
     return (patches == patches_hat).to(torch.float32)
 
 # Computes the Precision metric for a batch of predictions (how many retrieved items are relevant)
+# By convention: if TP, FP, FN are all zero                  => Precision value has to be 1
+#                if TP = 0 and at least FP or FN is non-zero => Precision value has to be 0
 def precision_fn(y_hat: torch.Tensor, y: torch.Tensor):
     gt_pos = y == 1.0
     gt_neg = y == 0.0
 
     pred_pos = y_hat >= 0.5
+    pred_neg = y_hat < 0.5
 
     true_pos = torch.logical_and(pred_pos, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
     false_pos = torch.logical_and(pred_pos, gt_neg).sum(dim=(-1, -2, -3), dtype=torch.float32)
+    false_neg = torch.logical_and(pred_neg, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
 
-    return (true_pos / (true_pos + false_pos))
+    denom = true_pos + false_pos
+    precision = torch.where(denom == 0, 0, true_pos / denom)
+    full_val = denom + false_neg
+    return torch.where(full_val == 0, 1, precision)
 
 # Computes the Recall metric for a batch of predictions (how many relevant items are retrieved)
+# By convention: if TP, FP, FN are all zero                  => Recall value has to be 1
+#                if TP = 0 and at least FP or FN is non-zero => Recall value has to be 0
 def recall_fn(y_hat: torch.Tensor, y: torch.Tensor):
     gt_pos = y == 1.0
+    gt_neg = y == 0.0
 
     pred_pos = y_hat >= 0.5
     pred_neg = y_hat < 0.5
 
     true_pos = torch.logical_and(pred_pos, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
+    false_pos = torch.logical_and(pred_pos, gt_neg).sum(dim=(-1, -2, -3), dtype=torch.float32)
     false_neg = torch.logical_and(pred_neg, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
 
-    return (true_pos / (true_pos + false_neg))
+    denom = true_pos + false_neg
+    recall = torch.where(denom == 0, 0, true_pos / denom)
+    full_val = denom + false_pos
+    return torch.where(full_val == 0, 1, recall)
 
 # Computes the F1 score metric for a batch of predictions
+# By convention: if TP, FP, FN are all zero                  => F1 score has to be 1
+#                if TP = 0 and at least FP or FN is non-zero => F1 score has to be 0
 def f1_fn(y_hat: torch.Tensor, y: torch.Tensor):
     precision = precision_fn(y_hat, y)
     recall = recall_fn(y_hat, y)
-    return (2 * precision * recall) / (precision + recall)
+
+    denom = precision + recall
+    return torch.where(denom == 0, 0, 2*precision*recall / denom)
 
 # Computes pixel-wise Intersection-over-Union per inference image
 def iou_fn(y_hat: torch.Tensor, y: torch.Tensor):
@@ -52,4 +70,5 @@ def iou_fn(y_hat: torch.Tensor, y: torch.Tensor):
     false_pos = torch.logical_and(pred_pos, gt_neg).sum(dim=(-1, -2, -3), dtype=torch.float32)
     false_neg = torch.logical_and(pred_neg, gt_pos).sum(dim=(-1, -2, -3), dtype=torch.float32)
 
-    return (true_pos / (true_pos + false_pos + false_neg))
+    denom = true_pos + false_pos + false_neg
+    return torch.where(denom == 0, 0, true_pos / denom)
