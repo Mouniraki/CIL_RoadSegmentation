@@ -9,6 +9,7 @@ class ImageDataset(Dataset):
                  for_train: bool, 
                  images_dir: str, 
                  masks_dir: str | None = None, 
+                 transforms = None,
                  img_size: tuple[int, int] = (400, 400), # Default size is (400, 400), otherwise we resize
                  use_patches: bool = False, 
                  patch_size: int=16, 
@@ -16,6 +17,7 @@ class ImageDataset(Dataset):
         self.for_train = for_train
         self.images_dir = images_dir
         self.masks_dir = masks_dir
+        self.transforms = transforms
         self.desired_img_h, self.desired_img_w = img_size
         self.use_patches = use_patches
         self.patch_size = patch_size
@@ -30,25 +32,28 @@ class ImageDataset(Dataset):
             idx = idx + 144 # Indices of testing images start from 144 instead of 0
         filename = f"satimage_{idx}.png"
         img_path = os.path.join(self.images_dir, filename)
+        mask_path = None if self.masks_dir is None else os.path.join(self.masks_dir, filename)
 
         # Loading an image & splitting it into patches (IMAGES HAVE 4 CHANNELS ORIGINALLY (r,g,b, alpha), PICK ONLY THE FIRST 3!)
         image = read_image(img_path)[:3,:,:] # (channels, height, width) with values as floating points between 0 and 1
+        mask = None if mask_path is None else read_image(mask_path)
+
+        # Resize image if its size is different from the given one
         _, h, w = image.shape
         if self.desired_img_h != h or self.desired_img_w != w:
             # Resize the image
             image = Resize(size=(self.desired_img_h, self.desired_img_w)).forward(image)
-        image = image / 255
-
-        # Handling the case of the mask
-        if self.masks_dir != None:
-            mask_path = os.path.join(self.masks_dir, filename)
-            mask = read_image(mask_path)
-            if self.desired_img_h != h or self.desired_img_w != w:
-                mask = Resize(size=(self.desired_img_h, self.desired_img_w)).forward(mask)
-            mask = mask / 255
-        else:
-            mask = None
+            mask = None if mask is None else Resize(size=(self.desired_img_h, self.desired_img_w)).forward(mask)
         
+        # Normalize pixels values to 0-1
+        image = image / 255
+        mask = None if mask is None else mask / 255
+
+        # Apply data augmentation if transforms is set
+        if self.transforms is not None:
+            image, mask = self.transforms(image, mask)
+
+        # Split images into patches if flag is set to True
         if self.use_patches:
             image = self.__split_in_patches(img=image).reshape(3, -1, self.patch_size, self.patch_size)
             labels = None if mask == None else (torch.mean(self.__split_in_patches(img=mask), (0, -1, -2), dtype=torch.float32) > self.cutoff).reshape(-1)

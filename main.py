@@ -11,6 +11,7 @@ from torchvision.transforms.functional import adjust_contrast
 
 # Importing the dataset & models
 from utils.loaders.image_dataset import ImageDataset
+from utils.loaders.transforms import compose, colorjitter
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
 
@@ -39,7 +40,7 @@ def main():
     # Setting up the model, loss function and optimizer
     # model = UNet().to(DEVICE)
     # loss_fn = torch.nn.BCELoss()
-    model = SegFormer(non_void_labels=['road'], device=DEVICE, checkpoint='nvidia/mit-b5')
+    model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
     loss_fn = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.00006)
 
@@ -47,11 +48,16 @@ def main():
     # Training routine
     #############################
     print("Starting training")
+    # Selecting the transformations to perform for data augmentation
+    transforms = compose.Compose([
+        colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2)
+    ])
     # Loading the whole training dataset
     images_dataset = ImageDataset(
         for_train=True,
         images_dir = os.path.abspath('dataset/training/images/'),
         masks_dir = os.path.abspath('dataset/training/groundtruth/'),
+        transforms=transforms,
         use_patches=False,
         # img_size=(512, 512)
     )
