@@ -1,5 +1,7 @@
 import torch
 
+# Source for Precision/Recall/F1 measurements: https://github.com/dice-group/gerbil/wiki/Precision,-Recall-and-F1-measure
+
 # Computes accuracy weighted by patches (metric used on Kaggle for evaluation)
 def patch_accuracy_fn(y_hat: torch.Tensor, y: torch.Tensor, patch_size: int = 16, cutoff: float = 0.25):
     h_patches = y.shape[-2] // patch_size

@@ -7,6 +7,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, random_split
 from torchvision.io import write_png
+from torchvision.transforms.functional import adjust_contrast
 
 # Importing the dataset & models
 from utils.loaders.image_dataset import ImageDataset
@@ -38,7 +39,7 @@ def main():
     # Setting up the model, loss function and optimizer
     # model = UNet().to(DEVICE)
     # loss_fn = torch.nn.BCELoss()
-    model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
+    model = SegFormer(non_void_labels=['road'], device=DEVICE, checkpoint='nvidia/mit-b5')
     loss_fn = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.00006)
 
@@ -72,6 +73,7 @@ def main():
             y = y.to(DEVICE)
             optimizer.zero_grad() # Zero-out gradients
             y_hat = model(x) # Forward pass
+            # y_hat = adjust_contrast(y_hat, contrast_factor=0.5) # Force the predictions to be more contrasted
             loss = loss_fn(y_hat, y)
             if type(loss_fn) == torch.nn.modules.loss.BCEWithLogitsLoss:
                 y_hat = torch.sigmoid(y_hat)
