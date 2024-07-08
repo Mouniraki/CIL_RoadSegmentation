@@ -26,7 +26,7 @@ CUTOFF = 0.25
 
 TRAIN_SPLIT = 0.8
 BATCH_SIZE = 4
-N_WORKERS = 0 # Base is 4, set to 0 if it causes errors
+N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
 N_EPOCHS = 5
 
 def main():
@@ -37,8 +37,9 @@ def main():
 
     # Setting up the model, loss function and optimizer
     # model = UNet().to(DEVICE)
-    model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b0').to(DEVICE)
-    loss_fn = torch.nn.BCELoss()
+    # loss_fn = torch.nn.BCELoss()
+    model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
+    loss_fn = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.00006)
 
     #############################
@@ -72,6 +73,8 @@ def main():
             optimizer.zero_grad() # Zero-out gradients
             y_hat = model(x) # Forward pass
             loss = loss_fn(y_hat, y)
+            if type(loss_fn) == torch.nn.modules.loss.BCEWithLogitsLoss:
+                y_hat = torch.sigmoid(y_hat)
             writer.add_scalar("Loss/train", loss.item(), epoch)
             loss.backward() # Backward pass
             optimizer.step()
@@ -86,6 +89,9 @@ def main():
                 y = y.to(DEVICE)
                 y_hat = model(x) # Perform forward pass
                 loss = loss_fn(y_hat, y)
+                # Apply a sigmoid to the inference result if we use the BCEWithLogitsLoss for metrics computations
+                if type(loss_fn) == torch.nn.modules.loss.BCEWithLogitsLoss:
+                    y_hat = torch.sigmoid(y_hat)
                 writer.add_scalar("Loss/eval", loss.item(), epoch)
 
                 batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat, y=y))
@@ -108,7 +114,7 @@ def main():
             writer.add_scalar(f"F1 score/eval", f1, epoch)
 
             print(f"Overall patch accuracy: {patch_acc}")
-            print(f"Intersection over Union: {mean_iou}")
+            print(f"Mean IoU: {mean_iou}")
             print(f"Precision: {precision}")
             print(f"Recall: {recall}")
             print(f"F1 Score: {f1}")
@@ -139,6 +145,8 @@ def main():
         for x, _ in test_dataloader:
             x = x.to(DEVICE)
             pred = model(x).detach().cpu()
+            if type(loss_fn) == torch.nn.modules.loss.BCEWithLogitsLoss:
+                pred = torch.sigmoid(pred)
             # Add channels to end up with RGB tensors, and save the predicted masks on disk
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
             for t in pred:
