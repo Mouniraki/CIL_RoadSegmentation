@@ -5,7 +5,7 @@ class Compose:
     def __init__(self, transforms: list):
         self.transforms = transforms
 
-    def __call__(self, input: torch.Tensor, target: torch.Tensor):
+    def __call__(self, input: torch.Tensor, target: torch.Tensor | None):
         for tr in self.transforms:
             input, target = tr(input, target)
 

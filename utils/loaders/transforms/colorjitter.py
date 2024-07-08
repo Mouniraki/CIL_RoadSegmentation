@@ -9,7 +9,7 @@ class ColorJitter:
         self.saturation = saturation
         self.hue = hue
 
-    def __call__(self, input: torch.Tensor, target: torch.Tensor):
+    def __call__(self, input: torch.Tensor, target: torch.Tensor | None):
         colortransform = v2.Compose([
             v2.ColorJitter(brightness=self.brightness, contrast=self.contrast, saturation=self.saturation, hue=self.hue)
         ])
