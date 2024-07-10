@@ -18,3 +18,10 @@ class SegFormer(nn.Module):
         # Interpolate the logits to have a properly sized segmentation map (since output of transformer is (N_LABELS, H//4, W//4) for each image)
         x = nn.functional.interpolate(x, size=(h, w), mode='bilinear', align_corners=False) # Default is bilinear with align_corners=False
         return x
+    
+    # Functions to handle model checkpoints
+    def save_pretrained(self, path: str):
+        return self.__model.save_pretrained(path)
+    
+    def load_pretrained(self, checkpoint: str):
+        return SegFormer(non_void_labels=self.__labels, checkpoint=checkpoint)

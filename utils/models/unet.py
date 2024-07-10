@@ -20,12 +20,12 @@ class Block(nn.Module):
 class UNet(nn.Module):
     def __init__(self, channels=(3,64,128,256,512,1024)):
         super(UNet, self).__init__()
-        enc_chs = channels
+        self.__enc_chs = channels
         dec_chs = channels[::-1][:-1] # Leave out the last value of the channels after flipping the list, since it is the number of channels of the final output
 
         # Encoder blocks (using the Block class)
         self.enc_blocks = nn.ModuleList([
-            Block(in_ch, out_ch) for in_ch, out_ch in zip(enc_chs[:-1], enc_chs[1:])
+            Block(in_ch, out_ch) for in_ch, out_ch in zip(self.__enc_chs[:-1], self.__enc_chs[1:])
         ])
         # 2x2 max pooling (down-sampling the data)
         self.pool = nn.MaxPool2d(kernel_size=2)
@@ -61,3 +61,12 @@ class UNet(nn.Module):
             x = block(x)
 
         return self.head(x) # Reduce to 1 channel
+    
+    # Functions to handle model checkpoints
+    def save_pretrained(self, path: str):
+        return torch.save(self.state_dict(), path)
+    
+    def load_pretrained(self, checkpoint: str):
+        m = UNet(channels=self.__enc_chs)
+        m.load_state_dict(torch.load(checkpoint))
+        return m
