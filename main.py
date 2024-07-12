@@ -19,7 +19,7 @@ from utils.models.segformer import SegFormer
 
 # Importing plot & metric utilities
 from utils.plotting import plot_patches, show_val_samples
-from utils.metrics import patch_accuracy_fn, iou_fn, precision_fn, recall_fn, f1_fn
+from utils.metrics import patch_accuracy_fn, iou_fn, precision_fn, recall_fn, f1_fn, patch_f1_fn
 
 # To select the proper hardware accelerator
 DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
@@ -138,7 +138,7 @@ def main():
             val_samples, val_predictions, ground_truths = [], [], []
             with torch.no_grad():
                 # To compute the overall patch accuracy
-                batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1 = [], [], [], [], []
+                batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1 = [], [], [], [], [], []
 
                 losses = [] # For the early stopping mechanism
                 for (x, y) in validation_dataloader:
@@ -160,6 +160,7 @@ def main():
                     batch_precision.append(precision_fn(y_hat=y_hat, y=y))
                     batch_recall.append(recall_fn(y_hat=y_hat, y=y))
                     batch_f1.append(f1_fn(y_hat=y_hat, y=y))
+                    batch_patch_f1.append(patch_f1_fn(y_hat=y_hat, y=y))
                 
                 # Computing the metrics
                 mean_loss = torch.tensor(losses).mean()
@@ -168,6 +169,7 @@ def main():
                 precision = torch.cat(batch_precision, dim=0).mean()
                 recall = torch.cat(batch_recall, dim=0).mean()
                 f1 = torch.cat(batch_f1, dim=0).mean()
+                patch_f1 = torch.cat(batch_patch_f1, dim=0).mean()
 
                 writer.add_scalar("Loss/eval", mean_loss, epoch)
                 writer.add_scalar(f"Accuracy/eval", patch_acc, epoch)
@@ -175,12 +177,14 @@ def main():
                 writer.add_scalar(f"Precision/eval", precision, epoch)
                 writer.add_scalar(f"Recall/eval", recall, epoch)
                 writer.add_scalar(f"F1 score/eval", f1, epoch)
+                writer.add_scalar(f"Patch F1 score/eval", patch_f1, epoch)
 
                 print(f"Overall patch accuracy: {patch_acc}")
                 print(f"Mean IoU: {mean_iou}")
                 print(f"Precision: {precision}")
                 print(f"Recall: {recall}")
                 print(f"F1 Score: {f1}")
+                print(f"Patch F1 Score: {patch_f1}")
                 print(f"Loss: {mean_loss}")
 
                 if DEBUG:
