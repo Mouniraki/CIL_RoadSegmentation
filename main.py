@@ -173,6 +173,9 @@ def main():
             elif epoch - best_epoch >= EARLY_STOPPING_THRESHOLD:
                 print(f"Early stopped at epoch {epoch+1} with best epoch {best_epoch+1}")
                 break
+    
+    writer.flush()
+    writer.close()
 
     #############################
     # Inference routine
@@ -206,8 +209,5 @@ def main():
                 t = (t * 255).type(torch.uint8) # Rescale everything in the 0-255 range to generate channels for images
                 write_png(input=t, filename=f'{INFERENCE_FOLDER}/{INFERENCE_FILE_PREFIX}_{img_idx}.png')
                 img_idx += 1
-
-    writer.flush()
-    writer.close()
 
 main()
