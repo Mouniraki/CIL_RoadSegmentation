@@ -13,6 +13,7 @@ from utils.loaders.image_dataset import ImageDataset
 from utils.loaders.transforms import compose, colorjitter, randomresizedcrop
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
+from utils.losses.diceloss import DiceLoss
 
 # Importing plot & metric utilities
 from utils.plotting import plot_patches, show_val_samples
@@ -26,7 +27,7 @@ PATCH_SIZE = 16
 CUTOFF = 0.25
 
 SELECTED_MODEL = "segformer" # Set this to the desired model
-DEBUG = False # To enable / disable the show_val_samples routine
+DEBUG = True # To enable / disable the show_val_samples routine
 TRAIN_SPLIT = 0.8
 LR = 0.00006
 BATCH_SIZE = 4
@@ -54,7 +55,8 @@ def main():
     # Setting up the model, loss function and optimizer
     if SELECTED_MODEL == 'segformer':
         model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
-        loss_fn = torch.nn.BCEWithLogitsLoss()
+        # loss_fn = torch.nn.BCEWithLogitsLoss()
+        loss_fn = DiceLoss(model=SELECTED_MODEL)
     else:
         model = UNet().to(DEVICE)
         loss_fn = torch.nn.BCELoss()
