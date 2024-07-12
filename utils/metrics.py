@@ -67,7 +67,7 @@ def patch_f1_fn(y_hat: torch.Tensor, y: torch.Tensor, patch_size: int=16, cutoff
     patches_hat = y_hat.reshape(-1, 1, h_patches, patch_size, w_patches, patch_size).mean((-1, -3)) > cutoff
     patches = y.reshape(-1, 1, h_patches, patch_size, w_patches, patch_size).mean((-1, -3)) > cutoff
 
-    return f1_fn(patches_hat.flatten(), patches.flatten)
+    return f1_fn(patches_hat, patches)
 
 # Computes pixel-wise Intersection-over-Union per inference image
 def iou_fn(y_hat: torch.Tensor, y: torch.Tensor):
