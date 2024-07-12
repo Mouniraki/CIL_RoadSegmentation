@@ -16,6 +16,7 @@ from utils.loaders.image_dataset import ImageDataset
 from utils.loaders.transforms import compose, colorjitter, randomresizedcrop
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
+from utils.losses.diceloss import DiceLoss
 
 # Importing plot & metric utilities
 from utils.plotting import plot_patches, show_val_samples
@@ -87,7 +88,8 @@ def main():
         # Setting up the model, loss function and optimizer
         if SELECTED_MODEL == 'segformer':
             model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
-            loss_fn = torch.nn.BCEWithLogitsLoss()
+            # loss_fn = torch.nn.BCEWithLogitsLoss()
+            loss_fn = DiceLoss(model=SELECTED_MODEL)
         else:
             model = UNet().to(DEVICE)
             loss_fn = torch.nn.BCELoss()
