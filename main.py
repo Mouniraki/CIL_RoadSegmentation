@@ -25,6 +25,8 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is
 PATCH_SIZE = 16
 CUTOFF = 0.25
 
+SELECTED_MODEL = "segformer" # Set this to the desired model
+DEBUG = False # To enable / disable the show_val_samples routine
 TRAIN_SPLIT = 0.8
 LR = 0.00006
 BATCH_SIZE = 4
@@ -50,10 +52,12 @@ def main():
     writer = SummaryWriter(log_dir=TENSORBOARD_FOLDER)
 
     # Setting up the model, loss function and optimizer
-    # model = UNet().to(DEVICE)
-    # loss_fn = torch.nn.BCELoss()
-    model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
-    loss_fn = torch.nn.BCEWithLogitsLoss()
+    if SELECTED_MODEL == 'segformer':
+        model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
+        loss_fn = torch.nn.BCEWithLogitsLoss()
+    else:
+        model = UNet().to(DEVICE)
+        loss_fn = torch.nn.BCELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
 
     #############################
@@ -103,7 +107,7 @@ def main():
             # y_hat = adjust_contrast(y_hat, contrast_factor=0.5) # Force the predictions to be more contrasted
             loss = loss_fn(y_hat, y)
             losses.append(loss.item())
-            if type(loss_fn) == torch.nn.modules.loss.BCEWithLogitsLoss:
+            if SELECTED_MODEL == 'segformer':
                 y_hat = torch.sigmoid(y_hat)
             loss.backward() # Backward pass
             optimizer.step()
@@ -123,8 +127,8 @@ def main():
                 y = y.to(DEVICE)
                 y_hat = model(x) # Perform forward pass
                 loss = loss_fn(y_hat, y)
-                # Apply a sigmoid to the inference result if we use the BCEWithLogitsLoss for metrics computations
-                if type(loss_fn) == torch.nn.modules.loss.BCEWithLogitsLoss:
+                # Apply a sigmoid to the inference result if we choose SegFormer as a model
+                if SELECTED_MODEL == 'segformer':
                     y_hat = torch.sigmoid(y_hat)
 
                 losses.append(loss.item())
@@ -157,7 +161,8 @@ def main():
             print(f"Loss: {mean_loss}")
 
             # Optional : display the validation samples used for validation
-            show_val_samples(x.detach().cpu(), y.detach().cpu(), y_hat.detach().cpu())
+            if DEBUG:
+                show_val_samples(x.detach().cpu(), y.detach().cpu(), y_hat.detach().cpu())
 
             if mean_loss <= best_loss:
                 best_loss = mean_loss
@@ -193,7 +198,7 @@ def main():
         for x, _ in test_dataloader:
             x = x.to(DEVICE)
             pred = model(x).detach().cpu()
-            if type(loss_fn) == torch.nn.modules.loss.BCEWithLogitsLoss:
+            if SELECTED_MODEL == 'segformer':
                 pred = torch.sigmoid(pred)
             # Add channels to end up with RGB tensors, and save the predicted masks on disk
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
