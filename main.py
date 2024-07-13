@@ -1,6 +1,8 @@
 import os
 from datetime import datetime # To save the predicted masks in a dated folder
 from tqdm import tqdm
+from torchvision.transforms import v2, functional
+
 
 # PyTorch imports
 import torch
@@ -10,13 +12,13 @@ from torchvision.io import write_png
 
 # Importing the dataset & models
 from utils.loaders.image_dataset import ImageDataset
-from utils.loaders.transforms import compose, colorjitter, randomresizedcrop
+from utils.loaders.transforms import compose, colorjitter, randomresizedcrop, rotation, randomerasing
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
 from utils.losses.diceloss import DiceLoss
 
 # Importing plot & metric utilities
-from utils.plotting import plot_patches, show_val_samples
+from utils.plotting import plot_patches, show_val_samples, plot_img_mask
 from utils.metrics import patch_accuracy_fn, iou_fn, precision_fn, recall_fn, f1_fn, patch_f1_fn
 
 # To select the proper hardware accelerator
@@ -34,6 +36,7 @@ BATCH_SIZE = 4
 N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
 N_EPOCHS = 100
 EARLY_STOPPING_THRESHOLD = 10
+N_AUGMENTATION = 5
 
 # To create folders for test predictions and model checkpoints
 CURR_DATE = datetime.now().strftime('%d-%m-%Y_%H-%M-%S')
@@ -49,6 +52,7 @@ INFERENCE_FILE_PREFIX = 'satimage'
 def main():
     print(f"Using {DEVICE} device")
 
+    
     # Initializing Tensorboard
     writer = SummaryWriter(log_dir=TENSORBOARD_FOLDER)
 
@@ -68,22 +72,32 @@ def main():
     # Create a directory for model checkpoints
     os.makedirs(CHECKPOINTS_FOLDER, exist_ok=True)
 
-    print("Starting training")
+    print("Starting training") 
     # Selecting the transformations to perform for data augmentation
-    transforms = compose.Compose([
-        colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-        randomresizedcrop.RandomResizedCrop(scale=(0.5, 1), ratio=(3/4, 4/3))
-    ])
+    transforms = compose.Compose([rotation.Rotation(angle=30),
+                                    colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+                                    randomerasing.RandomErasing(probability=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3))])
     # Loading the whole training dataset
     images_dataset = ImageDataset(
         for_train=True,
         images_dir = os.path.abspath(f'{TRAIN_DATASET_PATH}/images/'),
         masks_dir = os.path.abspath(f'{TRAIN_DATASET_PATH}/groundtruth/'),
-        transforms=transforms,
+        transforms= transforms,
         use_patches=False,
         # img_size=(512, 512)
     )
 
+    """Data augmentation"""
+    #images = []
+    #masks = []
+    #for _ in range(5):
+    #    img, mask = images_dataset[0]
+    #    images.append(img)
+    #    masks.append(mask)
+    #plot_img_mask(images, masks, 5) 
+    
+
+    
     # Performing a train/validation split
     train_dataset, val_dataset = random_split(images_dataset, [TRAIN_SPLIT, 1 - TRAIN_SPLIT])
 
@@ -101,22 +115,25 @@ def main():
         # Perform training
         model.train()
         losses = [] # To record metric
-        for (x, y) in progress_bar: # x = images, y = labels
-            x = x.to(DEVICE)
-            y = y.to(DEVICE)
-            optimizer.zero_grad() # Zero-out gradients
-            y_hat = model(x) # Forward pass
-            # y_hat = adjust_contrast(y_hat, contrast_factor=0.5) # Force the predictions to be more contrasted
-            loss = loss_fn(y_hat, y)
-            losses.append(loss.item())
-            if SELECTED_MODEL == 'segformer':
-                y_hat = torch.sigmoid(y_hat)
-            loss.backward() # Backward pass
-            optimizer.step()
+
+        for _ in range(N_AUGMENTATION):
+            for (x, y) in progress_bar: # x = images, y = labels
+                x = x.to(DEVICE)
+                y = y.to(DEVICE)
+                optimizer.zero_grad() # Zero-out gradients
+                y_hat = model(x) # Forward pass
+                # y_hat = adjust_contrast(y_hat, contrast_factor=0.5) # Force the predictions to be more contrasted
+                loss = loss_fn(y_hat, y)
+                losses.append(loss.item())
+                if SELECTED_MODEL == 'segformer':
+                    y_hat = torch.sigmoid(y_hat)
+                loss.backward() # Backward pass
+                optimizer.step()
         
         mean_loss = torch.tensor(losses).mean()
         writer.add_scalar("Loss/train", mean_loss.item(), epoch)
 
+        
         # Perform validation
         model.eval()
         with torch.no_grad():
@@ -215,5 +232,6 @@ def main():
                 t = (t * 255).type(torch.uint8) # Rescale everything in the 0-255 range to generate channels for images
                 write_png(input=t, filename=f'{INFERENCE_FOLDER}/{INFERENCE_FILE_PREFIX}_{img_idx}.png')
                 img_idx += 1
+
 
 main()
