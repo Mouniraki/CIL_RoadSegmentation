@@ -13,6 +13,7 @@ class DiceLoss(nn.Module):
         pixels_intersection = (output * target).sum(dim=(-1, -2, -3), dtype=torch.float32)
         pixels_union = output.sum(dim=(-1, -2, -3), dtype=torch.float32) + target.sum(dim=(-1, -2, -3), dtype=torch.float32)
 
-        loss = 1 - (2 * pixels_intersection / pixels_union).mean()
+        #1 is smooth factor
+        loss = 1 - ((2 * pixels_intersection + 1) / (pixels_union + 1)).mean()
         return loss
     
