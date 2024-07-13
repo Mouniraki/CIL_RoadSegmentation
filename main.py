@@ -74,7 +74,7 @@ def main():
 
     print("Starting training") 
     # Selecting the transformations to perform for data augmentation
-    transforms = compose.Compose([rotation.Rotation(angle=30),
+    transforms = compose.Compose([rotation.Rotation(angle=30, probability=0.6),
                                     colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
                                     randomerasing.RandomErasing(probability=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3))])
     # Loading the whole training dataset

@@ -4,32 +4,40 @@ import torchvision.transforms.functional as F
 import math
 
 class Rotation:
-    def __init__(self, angle: int):
+    def __init__(self, angle: int, probability: float):
         self.angle = angle
+        self.p = probability
 
     # Apply transformation to both input images and masks
     def __call__(self, input: torch.Tensor, target: torch.Tensor | None):
         # Random rotation
-        angle = T.RandomRotation.get_params([-self.angle, self.angle])
-        input = F.rotate(input, angle)
-        if target is not None:
-            target = F.rotate(target, angle)
+        if torch.rand(1) <= self.p:
         
-        # Random horizontal flip
-        if torch.rand(1) < 0.5:
-            input = F.hflip(input)
+            angle = T.RandomRotation.get_params([-self.angle, self.angle])
+            input = F.rotate(input, angle)
             if target is not None:
-                target = F.hflip(target)
+                target = F.rotate(target, angle)
+            
+            # Random horizontal flip
+            if torch.rand(1) < 0.5:
+                input = F.hflip(input)
+                if target is not None:
+                    target = F.hflip(target)
+            
+            # Random vertical flip
+            if torch.rand(1) < 0.5:
+                input = F.vflip(input)
+                if target is not None:
+                    target = F.vflip(target)
+            input_rot_cropped = crop_around_center(input, *largest_rotated_rect(400, 400, math.radians(angle)))
+            target_rot_cropped = crop_around_center(target, *largest_rotated_rect(400, 400, math.radians(angle)))
+            transform_resize = T.Resize((400, 400))
         
-        # Random vertical flip
-        if torch.rand(1) < 0.5:
-            input = F.vflip(input)
-            if target is not None:
-                target = F.vflip(target)
-        input_rot_cropped = crop_around_center(input, *largest_rotated_rect(400, 400, math.radians(angle)))
-        target_rot_cropped = crop_around_center(target, *largest_rotated_rect(400, 400, math.radians(angle)))
-        return input_rot_cropped, target_rot_cropped
-    
+            return transform_resize(input_rot_cropped), transform_resize(target_rot_cropped)
+        else:
+            return input, target
+        
+        
 #https://stackoverflow.com/questions/16702966/rotate-image-and-crop-out-black-borders
 def largest_rotated_rect(w, h, angle):
     """
