@@ -1,5 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
+import torchvision.transforms.functional as F
+import numpy as np
 
 def plot_patches(image, labels, d_patches=25):  
     fig, axs = plt.subplots(d_patches, d_patches, figsize=(18.5, 18.5))
@@ -30,4 +32,24 @@ def show_val_samples(x, y, y_hat, segmentation=False):
     #         axs[i].imshow(x[i].moveaxis(0, -1))
     #         axs[i].set_title(f'True: {torch.round(y[i]).item()}; Predicted: {torch.round(y_hat[i]).item()}')
     #         axs[i].set_axis_off()
+    plt.show()
+
+
+# pytorch works with CHW format instead of HWC
+def plot_img_mask(imgs, masks, nbr_of_pairs):
+    fig, axes = plt.subplots(nbr_of_pairs, 2, figsize=(10, 5 * nbr_of_pairs))
+    
+    for i in range(nbr_of_pairs):
+        img = imgs[i]
+        mask = masks[i]
+      
+        axes[i, 0].imshow(img.moveaxis(0, -1))
+        axes[i, 0].set_title(f'Image {i+1}')
+        axes[i, 0].axis('off')
+
+        axes[i, 1].imshow(mask.moveaxis(0, -1),  cmap='gray', vmin=0, vmax=1)
+        axes[i, 1].set_title(f'Mask {i+1}')
+        axes[i, 1].axis('off')
+        
+    plt.tight_layout()
     plt.show()
