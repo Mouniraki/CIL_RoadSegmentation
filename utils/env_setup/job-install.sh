@@ -12,13 +12,15 @@
 
 . /etc/profile.d/modules.sh
 
-echo "working"
 # TODO: MODIFY THE USERNAME WITH YOUR OWN
-python3 -m venv /home/moraki/env-cil
+$USERNAME="moraki"
 
-source /home/moraki/env-cil/bin/activate
+echo "working"
+python3 -m venv /home/$USERNAME/env-cil
 
-cd /home/moraki/CIL_RoadSegmentation/utils/env_setup
+source /home/$USERNAME/env-cil/bin/activate
+
+cd /home/$USERNAME/CIL_RoadSegmentation/utils/env_setup
 
 #### put python commands here
 

@@ -11,14 +11,17 @@
 ###SBATCH --mail-type=END,FAIL
 
 . /etc/profile.d/modules.sh
+
+# TODO: MODIFY THE USERNAME WITH YOUR OWN
+$USERNAME="moraki"
+
 module load cuda/12.1
 
 echo "working"
 
-# TODO: MODIFY THE USERNAME WITH YOUR OWN
-source /home/moraki/env-cil/bin/activate
+source /home/$USERNAME/env-cil/bin/activate
 
-cd /home/moraki/CIL_RoadSegmentation
+cd /home/$USERNAME/CIL_RoadSegmentation
 
 #### put python commands here
 
