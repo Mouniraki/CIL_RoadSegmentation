@@ -18,7 +18,7 @@ python3 -m venv /home/moraki/env-cil
 
 source /home/moraki/env-cil/bin/activate
 
-cd /home/moraki/CIL_RoadSegmentation
+cd /home/moraki/CIL_RoadSegmentation/utils/env_setup
 
 #### put python commands here
 
