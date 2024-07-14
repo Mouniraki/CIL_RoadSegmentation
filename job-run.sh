@@ -15,6 +15,7 @@ module load cuda/12.1
 
 echo "working"
 
+# TODO: MODIFY THE USERNAME WITH YOUR OWN
 source /home/moraki/env-cil/bin/activate
 
 cd /home/moraki/CIL_RoadSegmentation

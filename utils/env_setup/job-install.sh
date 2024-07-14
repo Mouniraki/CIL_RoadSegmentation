@@ -13,7 +13,7 @@
 . /etc/profile.d/modules.sh
 
 echo "working"
-
+# TODO: MODIFY THE USERNAME WITH YOUR OWN
 python3 -m venv /home/moraki/env-cil
 
 source /home/moraki/env-cil/bin/activate
