@@ -5,7 +5,7 @@ from tqdm import tqdm
 # PyTorch imports
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import DataLoader, random_split, SubsetRandomSampler
+from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision.io import write_png
 
 # For k-fold cross-validation
