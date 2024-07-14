@@ -27,7 +27,7 @@ PATCH_SIZE = 16
 CUTOFF = 0.25
 
 SELECTED_MODEL = "segformer" # Set this to the desired model
-DEBUG = True # To enable / disable the show_val_samples routine
+DEBUG = False # To enable / disable the show_val_samples routine
 TRAIN_SPLIT = 0.8
 LR = 0.00006
 BATCH_SIZE = 4
