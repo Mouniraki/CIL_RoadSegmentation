@@ -13,7 +13,7 @@
 . /etc/profile.d/modules.sh
 
 # TODO: MODIFY THE USERNAME WITH YOUR OWN
-$USERNAME="moraki"
+USERNAME="moraki"
 
 module load cuda/12.1
 

@@ -13,7 +13,7 @@
 . /etc/profile.d/modules.sh
 
 # TODO: MODIFY THE USERNAME WITH YOUR OWN
-$USERNAME="moraki"
+USERNAME="moraki"
 
 echo "working"
 python3 -m venv /home/$USERNAME/env-cil
