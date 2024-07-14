@@ -1,7 +1,4 @@
-env-cil/*
-__pycache__/*
-tensorboard
-logreg_submission.csv
-unet_submission.csv
-.idea/
-cnn_submission.csv
+dataset/
+tensorboard/
+predictions/
+checkpoints/
