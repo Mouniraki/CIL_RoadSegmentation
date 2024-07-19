@@ -13,7 +13,7 @@ from sklearn.model_selection import KFold
 
 # Importing the dataset & models
 from utils.loaders.image_dataset import ImageDataset
-from utils.loaders.transforms import compose, colorjitter, randomresizedcrop
+from utils.loaders.transforms import compose, rotation, colorjitter, randomerasing, randomresizedcrop
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
 from utils.losses.diceloss import DiceLoss
@@ -49,6 +49,8 @@ TEST_DATASET_PATH = 'dataset/test/images/'
 CHECKPOINTS_FILE_PREFIX = 'epoch'
 INFERENCE_FILE_PREFIX = 'satimage'
 
+N_AUGMENTATION = 5 # Set to 1 for only 1 pass
+
 def main():
     print(f"Using {DEVICE} device")
 
@@ -57,10 +59,9 @@ def main():
     #############################
     print("Starting training")
     # Selecting the transformations to perform for data augmentation
-    transforms = compose.Compose([
-        colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-        randomresizedcrop.RandomResizedCrop(scale=(0.5, 1), ratio=(3/4, 4/3))
-    ])
+    transforms = compose.Compose([rotation.Rotation(angle=30, probability=0.6),
+                                    colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+                                    randomerasing.RandomErasing(probability=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3))])
 
     # Instantiating the k-fold splits
     kfold = KFold(n_splits=K_FOLDS, shuffle=True)
@@ -119,18 +120,20 @@ def main():
             # Perform training
             model.train()
             losses = [] # To record metric
-            for (x, y) in progress_bar: # x = images, y = labels
-                x = x.to(DEVICE)
-                y = y.to(DEVICE)
-                optimizer.zero_grad() # Zero-out gradients
-                y_hat = model(x) # Forward pass
-                # y_hat = adjust_contrast(y_hat, contrast_factor=0.5) # Force the predictions to be more contrasted
-                loss = loss_fn(y_hat, y)
-                losses.append(loss.item())
-                if SELECTED_MODEL == 'segformer':
-                    y_hat = torch.sigmoid(y_hat)
-                loss.backward() # Backward pass
-                optimizer.step()
+
+            for _ in range(N_AUGMENTATION): # For the data augmentation pipeline
+                for (x, y) in progress_bar: # x = images, y = labels
+                    x = x.to(DEVICE)
+                    y = y.to(DEVICE)
+                    optimizer.zero_grad() # Zero-out gradients
+                    y_hat = model(x) # Forward pass
+                    # y_hat = adjust_contrast(y_hat, contrast_factor=0.5) # Force the predictions to be more contrasted
+                    loss = loss_fn(y_hat, y)
+                    losses.append(loss.item())
+                    if SELECTED_MODEL == 'segformer':
+                        y_hat = torch.sigmoid(y_hat)
+                    loss.backward() # Backward pass
+                    optimizer.step()
             
             mean_loss = torch.tensor(losses).mean()
             writer.add_scalar("Loss/train", mean_loss, epoch)
