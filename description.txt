@@ -1,0 +1,6 @@
+19-07-2024_12-18-18 -> Raw train/test split, no transforms, BCELoss
+19-07-2024_12-25-37 -> Raw train/test split, no transforms, DiceLoss
+19-07-2024_12-44-46 -> Raw train/test split, 1 pass transforms, BCELoss
+19-07-2024_12-54-38 -> Raw train/test split, 1 pass transforms, DiceLoss
+19-07-2024_13-20-19 -> Raw train/test split, 5 pass transforms (data augmentation), BCELoss
+19-07-2024_13-45-12 -> Raw train/test split, 5 pass transforms (data augmentation), DiceLoss
