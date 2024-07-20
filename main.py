@@ -10,7 +10,7 @@ from torchvision.io import write_png
 
 # Importing the dataset & models
 from utils.loaders.image_dataset import ImageDataset
-from utils.loaders.transforms import compose, colorjitter, randomresizedcrop
+from utils.loaders.transforms import compose, rotation, colorjitter, randomerasing, randomresizedcrop
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
 from utils.losses.diceloss import DiceLoss
@@ -27,7 +27,7 @@ PATCH_SIZE = 16
 CUTOFF = 0.25
 
 SELECTED_MODEL = "segformer" # Set this to the desired model
-DEBUG = True # To enable / disable the show_val_samples routine
+DEBUG = False # To enable / disable the show_val_samples routine
 TRAIN_SPLIT = 0.8
 LR = 0.00006
 BATCH_SIZE = 4
@@ -45,6 +45,8 @@ TRAIN_DATASET_PATH = 'dataset/training'
 TEST_DATASET_PATH = 'dataset/test/images/'
 CHECKPOINTS_FILE_PREFIX = 'epoch'
 INFERENCE_FILE_PREFIX = 'satimage'
+
+N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
 def main():
     print(f"Using {DEVICE} device")
@@ -70,10 +72,10 @@ def main():
 
     print("Starting training")
     # Selecting the transformations to perform for data augmentation
-    transforms = compose.Compose([
-        colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-        randomresizedcrop.RandomResizedCrop(scale=(0.5, 1), ratio=(3/4, 4/3))
-    ])
+    transforms = compose.Compose([rotation.Rotation(angle=30, probability=0.6),
+                                    colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+                                    randomerasing.RandomErasing(probability=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3))])
+    
     # Loading the whole training dataset
     images_dataset = ImageDataset(
         for_train=True,
@@ -101,18 +103,20 @@ def main():
         # Perform training
         model.train()
         losses = [] # To record metric
-        for (x, y) in progress_bar: # x = images, y = labels
-            x = x.to(DEVICE)
-            y = y.to(DEVICE)
-            optimizer.zero_grad() # Zero-out gradients
-            y_hat = model(x) # Forward pass
-            # y_hat = adjust_contrast(y_hat, contrast_factor=0.5) # Force the predictions to be more contrasted
-            loss = loss_fn(y_hat, y)
-            losses.append(loss.item())
-            if SELECTED_MODEL == 'segformer':
-                y_hat = torch.sigmoid(y_hat)
-            loss.backward() # Backward pass
-            optimizer.step()
+        # Perform data augmentation by re-feeding n times the training dataset with random transformations each time
+        for _ in range(N_AUGMENTATION):
+            for (x, y) in progress_bar: # x = images, y = labels
+                x = x.to(DEVICE)
+                y = y.to(DEVICE)
+                optimizer.zero_grad() # Zero-out gradients
+                y_hat = model(x) # Forward pass
+                # y_hat = adjust_contrast(y_hat, contrast_factor=0.5) # Force the predictions to be more contrasted
+                loss = loss_fn(y_hat, y)
+                losses.append(loss.item())
+                if SELECTED_MODEL == 'segformer':
+                    y_hat = torch.sigmoid(y_hat)
+                loss.backward() # Backward pass
+                optimizer.step()
         
         mean_loss = torch.tensor(losses).mean()
         writer.add_scalar("Loss/train", mean_loss.item(), epoch)
@@ -173,7 +177,8 @@ def main():
             if mean_loss <= best_loss:
                 best_loss = mean_loss
                 best_epoch = epoch
-                # Save a checkpoint
+                # Save a checkpoint if the best epoch is greater than 10 (avoid saving too much checkpoints)
+                # if epoch >= 5:
                 model.save_pretrained(f"{CHECKPOINTS_FOLDER}/{CHECKPOINTS_FILE_PREFIX}-{best_epoch+1}.pth")
                 # torch.save(model.state_dict, f"checkpoints/{CURR_DATE}/epoch-{best_epoch+1}.pth")
             elif epoch - best_epoch >= EARLY_STOPPING_THRESHOLD:
