@@ -6,7 +6,7 @@ class SegNet(nn.Module):
     def __init__(self, segformer, path_pretrained):
         super(SegNet, self).__init__()
         self.segformer = segformer
-        self.unet = UNet.load_pretrained(UNet(channels=self.__enc_chs), path_pretrained)
+        self.unet = UNet.load_pretrained(UNet(), path_pretrained)
 
     def forward(self, x):
         x = self.segformer(x)
