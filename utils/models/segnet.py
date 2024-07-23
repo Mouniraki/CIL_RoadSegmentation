@@ -19,6 +19,6 @@ class SegNet(nn.Module):
         return torch.save(self.state_dict(), path)
     
     def load_pretrained(self, checkpoint: str):
-        m = SegNet(channels=self.__enc_chs)
+        m = SegNet()
         m.load_state_dict(torch.load(checkpoint))
         return m
