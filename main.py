@@ -14,6 +14,7 @@ from torchvision.io import write_png
 from utils.loaders.image_dataset import ImageDataset
 from utils.loaders.transforms import compose, colorjitter, randomresizedcrop, rotation, randomerasing
 from utils.models.unet import UNet
+from utils.models.segnet import SegNet
 from utils.models.segformer import SegFormer
 from utils.losses.diceloss import DiceLoss
 
@@ -28,7 +29,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is
 PATCH_SIZE = 16
 CUTOFF = 0.25
 
-SELECTED_MODEL = "segformer" # Set this to the desired model
+SELECTED_MODEL = "segnet" # Set this to the desired model
 DEBUG = True # To enable / disable the show_val_samples routine
 TRAIN_SPLIT = 0.8
 LR = 0.00006
@@ -61,6 +62,11 @@ def main():
         model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
         # loss_fn = torch.nn.BCEWithLogitsLoss()
         loss_fn = DiceLoss(model=SELECTED_MODEL)
+    
+    elif(SELECTED_MODEL == "segnet"):
+        segformer = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
+        model = SegNet(segformer=segformer, path_pretrained="utils/models/refinement_model_pretrained").to(DEVICE)
+        loss_fn = torch.nn.BCELoss()
     else:
         model = UNet().to(DEVICE)
         loss_fn = torch.nn.BCELoss()
