@@ -1,12 +1,12 @@
-19-07-2024_12-18-18 -> Raw train/test split, no transforms, BCELoss | Best epoch:11
-19-07-2024_12-25-37 -> Raw train/test split, no transforms, DiceLoss | Best epoch:39
-19-07-2024_12-44-46 -> Raw train/test split, 1 pass transforms, BCELoss | Best epoch:23
-19-07-2024_12-54-38 -> Raw train/test split, 1 pass transforms, DiceLoss | Best epoch:57
-19-07-2024_13-20-19 -> Raw train/test split, 5 pass transforms (data augmentation), BCELoss | Best epoch:8
-19-07-2024_13-45-12 -> Raw train/test split, 5 pass transforms (data augmentation), DiceLoss | Best epoch:29
-19-07-2024_14-44-08 -> K-Fold cross-validation with K=5, no transforms, BCELoss | Best epochs:[19, 12, 11, 14, 8]
-19-07-2024_15-20-25 -> K-Fold cross-validation with K=5, no transforms, DiceLoss | Best epochs:[35, 21, 32, 22, 66]
-19-07-2024_18-02-04 -> K-Fold cross-validation with K=5, 1 pass transforms, BCELoss | Best epochs:[27, 28, 44, 14, 33]
-19-07-2024_19-44-28 -> K-Fold cross-validation with K=5, 1 pass transforms, DiceLoss | Best epochs:[16, 50, 19, 23, 26]
-19-07-2024_20-40-46 -> K-Fold cross-validation with K=5, 5 pass transform (data augmentation), BCELoss | Best epochs:[9, 14, 13, 12, 15]
-20-07-2024_04-15-16 -> K-Fold cross-validation with K=5, 5 pass transform (data augmentation), DiceLoss | Best epochs:[15, 52, 31, 13, 31]
+22-07-2024_13-12-55 -> Raw train/test split, no transforms, BCELoss | Best epoch:12
+22-07-2024_13-19-19 -> Raw train/test split, no transforms, DiceLoss | Best epoch:45
+22-07-2024_13-38-13 -> Raw train/test split, 1 pass transforms, BCELoss | Best epoch:35
+22-07-2024_13-51-30 -> Raw train/test split, 1 pass transforms, DiceLoss | Best epoch:28
+22-07-2024_14-04-17 -> Raw train/test split, 5 pass transforms (data augmentation), BCELoss | Best epoch:7
+22-07-2024_16-50-49 -> Raw train/test split, 5 pass transforms (data augmentation), DiceLoss | Best epoch:14
+23-07-2024_01-43-42 -> K-Fold cross-validation with K=5, no transforms, BCELoss | Best epochs:[8, 18, 10, 9, 7]
+23-07-2024_02-31-39 -> K-Fold cross-validation with K=5, no transforms, DiceLoss | Best epochs:[42, 34, 28, 23, 79]
+23-07-2024_10-19-23 -> K-Fold cross-validation with K=5, 1 pass transforms, BCELoss | Best epochs:[24, 19, 39, 34, 39]
+23-07-2024_11-20-54 -> K-Fold cross-validation with K=5, 1 pass transforms, DiceLoss | Best epochs:[40, 25, 32, 44, 24]
+23-07-2024_12-24-26 -> K-Fold cross-validation with K=5, 5 pass transform (data augmentation), BCELoss | Best epochs:[14, 17, 10, 12, 13]
+23-07-2024_14-51-05 -> K-Fold cross-validation with K=5, 5 pass transform (data augmentation), DiceLoss | Best epochs:[16, 35, 27, 19, 34]
