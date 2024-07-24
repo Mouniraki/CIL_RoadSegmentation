@@ -1,5 +1,7 @@
 import os
 from datetime import datetime # To save the predicted masks in a dated folder
+
+import cv2
 from tqdm import tqdm
 
 # PyTorch imports
@@ -13,11 +15,12 @@ from utils.loaders.image_dataset import ImageDataset
 from utils.loaders.transforms import compose, colorjitter, randomresizedcrop
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
-from utils.losses.diceloss import DiceLoss
+from utils.losses.diceloss import DiceLoss, WeightedDiceLoss, BorderDiceLoss
 
 # Importing plot & metric utilities
-from utils.plotting import plot_patches, show_val_samples
+from utils.plotting import plot_patches, show_val_samples, show_val_samples_heatMap, show_only_labels
 from utils.metrics import patch_accuracy_fn, iou_fn, precision_fn, recall_fn, f1_fn, patch_f1_fn
+from utils.post_processing.post_processing import PostProcessing
 
 # To select the proper hardware accelerator
 DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
@@ -32,8 +35,12 @@ TRAIN_SPLIT = 0.8
 LR = 0.00006
 BATCH_SIZE = 4
 N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
-N_EPOCHS = 100
+N_EPOCHS = 10
 EARLY_STOPPING_THRESHOLD = 10
+
+
+#TODO add a variable to reuse checkpoint instead of retraining
+POSTPROCESSING = True
 
 # To create folders for test predictions and model checkpoints
 CURR_DATE = datetime.now().strftime('%d-%m-%Y_%H-%M-%S')
@@ -56,7 +63,8 @@ def main():
     if SELECTED_MODEL == 'segformer':
         model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
         # loss_fn = torch.nn.BCEWithLogitsLoss()
-        loss_fn = DiceLoss(model=SELECTED_MODEL)
+        loss_fn_training = BorderDiceLoss(model=SELECTED_MODEL)
+        loss_fn_validation = DiceLoss(model=SELECTED_MODEL)
     else:
         model = UNet().to(DEVICE)
         loss_fn = torch.nn.BCELoss()
@@ -73,7 +81,7 @@ def main():
     transforms = compose.Compose([
         colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
         randomresizedcrop.RandomResizedCrop(scale=(0.5, 1), ratio=(3/4, 4/3))
-    ])
+    ]) #TODO why no rotation
     # Loading the whole training dataset
     images_dataset = ImageDataset(
         for_train=True,
@@ -83,6 +91,7 @@ def main():
         use_patches=False,
         # img_size=(512, 512)
     )
+    #TODO check differencce in size
 
     # Performing a train/validation split
     train_dataset, val_dataset = random_split(images_dataset, [TRAIN_SPLIT, 1 - TRAIN_SPLIT])
@@ -107,7 +116,7 @@ def main():
             optimizer.zero_grad() # Zero-out gradients
             y_hat = model(x) # Forward pass
             # y_hat = adjust_contrast(y_hat, contrast_factor=0.5) # Force the predictions to be more contrasted
-            loss = loss_fn(y_hat, y)
+            loss = loss_fn_training(y_hat, y)
             losses.append(loss.item())
             if SELECTED_MODEL == 'segformer':
                 y_hat = torch.sigmoid(y_hat)
@@ -120,27 +129,48 @@ def main():
         # Perform validation
         model.eval()
         with torch.no_grad():
-            # To compute the overall patch accuracy
-            batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1 = [], [], [], [], [], []
+            with torch.autograd.set_detect_anomaly(True):
+                # To compute the overall patch accuracy
+                batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1 = [], [], [], [], [], []
 
-            losses = [] # For the early stopping mechanism
-            for (x, y) in validation_dataloader:
-                x = x.to(DEVICE)
-                y = y.to(DEVICE)
-                y_hat = model(x) # Perform forward pass
-                loss = loss_fn(y_hat, y)
-                # Apply a sigmoid to the inference result if we choose SegFormer as a model
-                if SELECTED_MODEL == 'segformer':
-                    y_hat = torch.sigmoid(y_hat)
+                losses = [] # For the early stopping mechanism
+                for (x, y) in validation_dataloader:
+                    x = x.to(DEVICE)
+                    y = y.to(DEVICE)
+                    y_hat = model(x) # Perform forward pass
+                    loss = loss_fn_validation(y_hat, y)
+                    # Apply a sigmoid to the inference result if we choose SegFormer as a model
 
-                losses.append(loss.item())
-                batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat, y=y))
-                batch_iou.append(iou_fn(y_hat=y_hat, y=y))
-                batch_precision.append(precision_fn(y_hat=y_hat, y=y))
-                batch_recall.append(recall_fn(y_hat=y_hat, y=y))
-                batch_f1.append(f1_fn(y_hat=y_hat, y=y))
-                batch_patch_f1.append(patch_f1_fn(y_hat=y_hat, y=y))
-            
+                    y_hat_debugging = y_hat
+                    if SELECTED_MODEL == 'segformer':
+                        y_hat = torch.sigmoid(y_hat)
+                        pass
+
+
+                    #ONLY for debugging to remove
+                    shift_sigm = 1
+                    y_hat_debugging = torch.sigmoid(y_hat_debugging-shift_sigm)
+
+                    sobel_x = torch.tensor([[-1., 0., 1.],[-2., 0., 2.],[-1., 0., 1.]]).unsqueeze(0).unsqueeze(0).to(DEVICE)
+                    sobel_y = torch.tensor([[-1., -2., -1.],[0., 0., 0.],[1., 2., 1.]]).unsqueeze(0).unsqueeze(0).to(DEVICE)
+
+                    # Apply Sobel filter
+                    edge_x = torch.nn.functional.conv2d(y_hat_debugging, sobel_x, padding=0)
+                    edge_y = torch.nn.functional.conv2d(y_hat_debugging, sobel_y, padding=0)
+                    magnitude = torch.sqrt(edge_x ** 2 + edge_y ** 2)
+                    edge = (magnitude > 0.5).float()
+                    #show_val_samples_heatMap(x.detach().cpu(), y.detach().cpu(), edge.detach().cpu())
+
+                    # end
+
+
+                    losses.append(loss.item())
+                    batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat, y=y))
+                    batch_iou.append(iou_fn(y_hat=y_hat, y=y))
+                    batch_precision.append(precision_fn(y_hat=y_hat, y=y))
+                    batch_recall.append(recall_fn(y_hat=y_hat, y=y))
+                    batch_f1.append(f1_fn(y_hat=y_hat, y=y))
+                    batch_patch_f1.append(patch_f1_fn(y_hat=y_hat, y=y))
             # Computing the metrics
             mean_loss = torch.tensor(losses).mean()
             patch_acc = torch.cat(batch_patch_acc, dim=0).mean()
@@ -168,7 +198,7 @@ def main():
 
             # Optional : display the validation samples used for validation
             if DEBUG:
-                show_val_samples(x.detach().cpu(), y.detach().cpu(), y_hat.detach().cpu())
+                show_val_samples_heatMap(x.detach().cpu(), y.detach().cpu(), y_hat.detach().cpu())
 
             if mean_loss <= best_loss:
                 best_loss = mean_loss
@@ -176,12 +206,82 @@ def main():
                 # Save a checkpoint
                 model.save_pretrained(f"{CHECKPOINTS_FOLDER}/{CHECKPOINTS_FILE_PREFIX}-{best_epoch+1}.pth")
                 # torch.save(model.state_dict, f"checkpoints/{CURR_DATE}/epoch-{best_epoch+1}.pth")
-            elif epoch - best_epoch >= EARLY_STOPPING_THRESHOLD:
-                print(f"Early stopped at epoch {epoch+1} with best epoch {best_epoch+1}")
+            elif epoch - best_epoch >= EARLY_STOPPING_THRESHOLD or epoch == N_EPOCHS -1 :
+                if epoch - best_epoch >= EARLY_STOPPING_THRESHOLD:# TODO can't it be that the first validation is very lucky but the result still improve in waves
+                    print(f"Early stopped at epoch {epoch+1} with best epoch {best_epoch+1}")
                 break
     
     writer.flush()
     writer.close()
+
+    ######Validation with postprocessing
+
+    if POSTPROCESSING:
+        # Perform validation
+        model.eval()
+        with torch.no_grad():
+            # To compute the overall patch accuracy
+            batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1 = [], [], [], [], [], []
+            for (x, y) in validation_dataloader:
+                x, y = x.to(DEVICE), y.to(DEVICE)
+                y_hat = model(x)  # Perform forward pass
+                postprocessing = PostProcessing(postprocessing_patch_size=16)
+
+
+                y_hat_post_processed = postprocessing.connect_road_segements(y_hat)
+
+
+                loss = loss_fn_validation(y_hat_post_processed, y)
+                if SELECTED_MODEL == 'segformer':
+                    y_hat_post_processed = torch.sigmoid(y_hat_post_processed)
+
+                # ONLY for debugging to remove
+                shift_sigm = 1
+                y_hat_debugging = torch.sigmoid(y_hat_debugging - shift_sigm)
+
+                sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]]).unsqueeze(0).unsqueeze(0).to(
+                    DEVICE)
+                sobel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]]).unsqueeze(0).unsqueeze(0).to(
+                    DEVICE)
+
+                # Apply Sobel filter
+                edge_x = torch.nn.functional.conv2d(y_hat_debugging, sobel_x, padding=0)
+                edge_y = torch.nn.functional.conv2d(y_hat_debugging, sobel_y, padding=0)
+                magnitude = torch.sqrt(edge_x ** 2 + edge_y ** 2)
+                edge = (magnitude > 0.5).float()
+                # show_val_samples_heatMap(x.detach().cpu(), y.detach().cpu(), edge.detach().cpu())
+
+                # end
+                losses.append(loss.item())
+                batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat_post_processed, y=y))
+                batch_iou.append(iou_fn(y_hat=y_hat_post_processed, y=y))
+                batch_precision.append(precision_fn(y_hat=y_hat_post_processed, y=y))
+                batch_recall.append(recall_fn(y_hat=y_hat_post_processed, y=y))
+                batch_f1.append(f1_fn(y_hat=y_hat_post_processed, y=y))
+                batch_patch_f1.append(patch_f1_fn(y_hat=y_hat_post_processed, y=y))
+                break
+        # Computing the metrics
+        mean_loss = torch.tensor(losses).mean()
+        patch_acc = torch.cat(batch_patch_acc, dim=0).mean()
+        mean_iou = torch.cat(batch_iou, dim=0).mean()
+        precision = torch.cat(batch_precision, dim=0).mean()
+        recall = torch.cat(batch_recall, dim=0).mean()
+        f1 = torch.cat(batch_f1, dim=0).mean()
+        patch_f1 = torch.cat(batch_patch_f1, dim=0).mean()
+
+        print(f"Overall patch accuracy: {patch_acc}")
+        print(f"Mean IoU: {mean_iou}")
+        print(f"Precision: {precision}")
+        print(f"Recall: {recall}")
+        print(f"F1 Score: {f1}")
+        print(f"Patch F1 Score: {patch_f1}")
+        print(f"Loss: {mean_loss}")
+
+        # Optional : display the validation samples used for validation
+        if DEBUG:
+            show_only_labels(y_hat.detach().cpu(), y_hat_post_processed.detach().cpu(), y.detach().cpu())
+
+
 
     #############################
     # Inference routine
@@ -209,6 +309,7 @@ def main():
             pred = model(x).detach().cpu()
             if SELECTED_MODEL == 'segformer':
                 pred = torch.sigmoid(pred)
+
             # Add channels to end up with RGB tensors, and save the predicted masks on disk
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
             for t in pred:
