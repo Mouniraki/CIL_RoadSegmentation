@@ -21,6 +21,7 @@ from utils.losses.diceloss import DiceLoss
 # Importing plot & metric utilities
 from utils.plotting import plot_patches, show_val_samples
 from utils.metrics import patch_accuracy_fn, iou_fn, precision_fn, recall_fn, f1_fn, patch_f1_fn
+from utils.post_processing.post_processing import PostProcessing
 
 # To select the proper hardware accelerator
 DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
@@ -114,27 +115,34 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
     with torch.no_grad():
         # For debugging visualization
-        val_samples, val_predictions, ground_truths = [], [], []
+        val_samples, ground_truths, val_predictions, val_predictions_p = [], [], [], []
 
         # To compute the overall patch accuracy
-        batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1 = [], [], [], [], [], []
-        losses = []
+        batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1, losses = [], [], [], [], [], [], []
+        batch_patch_acc_p, batch_iou_p, batch_precision_p, batch_recall_p, batch_f1_p, batch_patch_f1_p, losses_p = [], [], [], [], [], [], []
 
         progress_bar = tqdm(iterable=eval_loader, desc=f"Processing the samples...")
         for (x, y) in progress_bar:
             x = x.to(DEVICE)
             y = y.to(DEVICE)
-            y_hat = torch.stack([m(x) for m in models]).mean(dim=0)
-            loss = loss_fn(y_hat, y)
-
-            # Apply a sigmoid to the inference result if we use the BCEWithLogitsLoss for metrics computations
-            if SELECTED_MODEL == 'segformer':
-                y_hat = torch.sigmoid(y_hat)
-
             val_samples.append(x.detach().cpu())
-            val_predictions.append(y_hat.detach().cpu())
             ground_truths.append(y.detach().cpu())
 
+            #compute model prediction
+            y_hat = torch.stack([m(x) for m in models]).mean(dim=0)
+
+
+
+            #pass the prediction though the postprocessing module
+            postprocessing = PostProcessing(postprocessing_patch_size=16)
+            y_hat_post_processed = postprocessing.connect_road_segements(y_hat)
+
+
+
+            # metrics model raw
+            loss = loss_fn(y_hat, y)
+            if SELECTED_MODEL == 'segformer': y_hat = torch.sigmoid(y_hat)
+            val_predictions.append(y_hat.detach().cpu())
             losses.append(loss.item())
             batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat, y=y))
             batch_iou.append(iou_fn(y_hat=y_hat, y=y))
@@ -143,127 +151,40 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
             batch_f1.append(f1_fn(y_hat=y_hat, y=y))
             batch_patch_f1.append(patch_f1_fn(y_hat=y_hat, y=y))
 
-        # Computing the metrics
-        mean_loss = torch.tensor(losses).mean()
-        patch_acc = torch.cat(batch_patch_acc, dim=0).mean()
-        mean_iou = torch.cat(batch_iou, dim=0).mean()
-        precision = torch.cat(batch_precision, dim=0).mean()
-        recall = torch.cat(batch_recall, dim=0).mean()
-        f1 = torch.cat(batch_f1, dim=0).mean()
-        patch_f1 = torch.cat(batch_patch_f1, dim=0).mean()
+            # metrics model postprocessed
+            loss = loss_fn(y_hat_post_processed, y)
+            if SELECTED_MODEL == 'segformer': y_hat = torch.sigmoid(y_hat_post_processed)
+            val_predictions.append(y_hat_post_processed.detach().cpu())
+            losses.append(loss.item())
+            batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat_post_processed, y=y))
+            batch_iou.append(iou_fn(y_hat=y_hat_post_processed, y=y))
+            batch_precision.append(precision_fn(y_hat=y_hat_post_processed, y=y))
+            batch_recall.append(recall_fn(y_hat=y_hat_post_processed, y=y))
+            batch_f1.append(f1_fn(y_hat=y_hat_post_processed, y=y))
+            batch_patch_f1.append(patch_f1_fn(y_hat=y_hat_post_processed, y=y))
 
-        # writer.add_scalar("Loss/eval", mean_loss, epoch)
-        # writer.add_scalar(f"Accuracy/eval", patch_acc, epoch)
-        # writer.add_scalar(f"Mean IoU/eval", mean_iou, epoch)
-        # writer.add_scalar(f"Precision/eval", precision, epoch)
-        # writer.add_scalar(f"Recall/eval", recall, epoch)
-        # writer.add_scalar(f"F1 score/eval", f1, epoch)
-        # writer.add_scalar(f"Patch F1 score/eval", patch_f1, epoch)
 
-        print(f"Overall patch accuracy: {patch_acc}")
-        print(f"Mean IoU: {mean_iou}")
-        print(f"Precision: {precision}")
-        print(f"Recall: {recall}")
-        print(f"F1 Score: {f1}")
-        print(f"Patch F1 Score: {patch_f1}")
-        print(f"Loss: {mean_loss}")
+        print("----------Model raw metrics----------")
+        print(f"Overall patch accuracy: {torch.cat(batch_patch_acc, dim=0).mean()}")
+        print(f"Mean IoU: { torch.cat(batch_iou, dim=0).mean()}")
+        print(f"Precision: {torch.cat(batch_precision, dim=0).mean()}")
+        print(f"Recall: {torch.cat(batch_recall, dim=0).mean()}")
+        print(f"F1 Score: {torch.cat(batch_f1, dim=0).mean()}")
+        print(f"Patch F1 Score: {torch.cat(batch_patch_f1, dim=0).mean()}")
+        print(f"Loss: {torch.tensor(losses).mean()}")
+        print("----------Model postprocessed metrics:----------")
+        print(f"Overall patch accuracy: {torch.cat(batch_patch_acc_p, dim=0).mean()}")
+        print(f"Mean IoU: { torch.cat(batch_iou_p, dim=0).mean()}")
+        print(f"Precision: {torch.cat(batch_precision_p, dim=0).mean()}")
+        print(f"Recall: {torch.cat(batch_recall_p, dim=0).mean()}")
+        print(f"F1 Score: {torch.cat(batch_f1_p, dim=0).mean()}")
+        print(f"Patch F1 Score: {torch.cat(batch_patch_f1_p, dim=0).mean()}")
+        print(f"Loss: {torch.tensor(losses_p).mean()}")
 
         if DEBUG:
             # For debugging purposes : display the validation samples used for validation
             show_val_samples(torch.cat(val_samples, dim=0), torch.cat(ground_truths, dim=0), torch.cat(val_predictions, dim=0))
 
-    # kfold = KFold(n_splits=5, shuffle=True)
 
-    # for fold, (train_idx, val_idx) in enumerate(kfold.split(images_dataset)):
-    #     print(f"Fold {fold+1}")
-    #     train_loader = DataLoader(
-    #             dataset=images_dataset,
-    #             batch_size=BATCH_SIZE,
-    #             num_workers=N_WORKERS,
-    #             sampler=SubsetRandomSampler(train_idx)
-    #         )
-
-    #     eval_loader = DataLoader(
-    #             dataset=images_dataset,
-    #             batch_size=BATCH_SIZE,
-    #             num_workers=N_WORKERS,
-    #             sampler=SubsetRandomSampler(val_idx)
-    #         )
-
-    #     # Doing model selection
-    #     if SELECTED_MODEL == 'segformer':
-    #         model = SegFormer(non_void_labels=['road'])
-    #         # loss_fn = torch.nn.BCEWithLogitsLoss()
-    #         loss_fn = DiceLoss(model = SELECTED_MODEL)
-    #     else:
-    #         model = UNet()
-    #         # loss_fn = torch.nn.BCELoss()
-    #         loss_fn = DiceLoss(model = SELECTED_MODEL)
-
-    #     # Loading the best models from checkpoints
-    #     if n_models > 1:
-    #         models = [model.load_pretrained(checkpoint=f"{CHECKPOINTS_FOLDER}/fold_{i+1}/{CHECKPOINTS_FILE_PREFIX}-{best_epochs[i]}.pth").to(DEVICE) for i in range(n_models)]
-    #     else:
-    #         models = [model.load_pretrained(checkpoint=f"{CHECKPOINTS_FOLDER}/{CHECKPOINTS_FILE_PREFIX}-{best_epochs[0]}.pth").to(DEVICE)]
-
-
-    #     # Setting all models to eval mode
-    #     for m in models:
-    #         m.eval()
-
-    #     with torch.no_grad():
-    #         # For debugging visualization
-    #         val_samples, val_predictions, ground_truths = [], [], []
-
-    #         # To compute the overall patch accuracy
-    #         batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1 = [], [], [], [], [], []
-    #         losses = []
-    #         for (x, y) in eval_loader:
-    #             x = x.to(DEVICE)
-    #             y = y.to(DEVICE)
-    #             output = torch.tensor([m(x) for m in models]).mean(dim=0)
-    #             loss = loss_fn(output, y)
-
-    #             # Apply a sigmoid to the inference result if we use the BCEWithLogitsLoss for metrics computations
-    #             if SELECTED_MODEL == 'segformer':
-    #                 y_hat = torch.sigmoid(y_hat)
-
-    #             val_samples.append(x.detach().cpu())
-    #             val_predictions.append(y_hat.detach().cpu())
-    #             ground_truths.append(y.detach().cpu())
-
-    #             losses.append(loss.item())
-    #             batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat, y=y))
-    #             batch_iou.append(iou_fn(y_hat=y_hat, y=y))
-    #             batch_precision.append(precision_fn(y_hat=y_hat, y=y))
-    #             batch_recall.append(recall_fn(y_hat=y_hat, y=y))
-    #             batch_f1.append(f1_fn(y_hat=y_hat, y=y))
-    #             batch_patch_f1.append(patch_f1_fn(y_hat=y_hat, y=y))
-
-    #             # Computing the metrics
-    #             mean_loss = torch.tensor(losses).mean()
-    #             patch_acc = torch.cat(batch_patch_acc, dim=0).mean()
-    #             mean_iou = torch.cat(batch_iou, dim=0).mean()
-    #             precision = torch.cat(batch_precision, dim=0).mean()
-    #             recall = torch.cat(batch_recall, dim=0).mean()
-    #             f1 = torch.cat(batch_f1, dim=0).mean()
-    #             patch_f1 = torch.cat(batch_patch_f1, dim=0).mean()
-
-    #             # writer.add_scalar("Loss/eval", mean_loss, epoch)
-    #             # writer.add_scalar(f"Accuracy/eval", patch_acc, epoch)
-    #             # writer.add_scalar(f"Mean IoU/eval", mean_iou, epoch)
-    #             # writer.add_scalar(f"Precision/eval", precision, epoch)
-    #             # writer.add_scalar(f"Recall/eval", recall, epoch)
-    #             # writer.add_scalar(f"F1 score/eval", f1, epoch)
-    #             # writer.add_scalar(f"Patch F1 score/eval", patch_f1, epoch)
-
-    #             print(f"Overall patch accuracy: {patch_acc}")
-    #             print(f"Mean IoU: {mean_iou}")
-    #             print(f"Precision: {precision}")
-    #             print(f"Recall: {recall}")
-    #             print(f"F1 Score: {f1}")
-    #             print(f"Patch F1 Score: {patch_f1}")
-    #             print(f"Loss: {mean_loss}")
-
-
-postprocessing_pipeline()
+if __name__ == "__main__":
+    postprocessing_pipeline()
