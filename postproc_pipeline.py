@@ -19,7 +19,7 @@ from utils.models.segformer import SegFormer
 from utils.losses.diceloss import DiceLoss
 
 # Importing plot & metric utilities
-from utils.plotting import plot_patches, show_val_samples
+from utils.plotting import plot_patches, show_val_samples, show_only_labels
 from utils.metrics import patch_accuracy_fn, iou_fn, precision_fn, recall_fn, f1_fn, patch_f1_fn
 from utils.post_processing.post_processing import PostProcessing
 
@@ -135,8 +135,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
             #pass the prediction though the postprocessing module
             postprocessing = PostProcessing(postprocessing_patch_size=16)
-            y_hat_post_processed = postprocessing.connect_road_segements(y_hat)
-
+            y_hat_post_processed = postprocessing.connect_roads(y_hat, downsample=1, max_dist=25, min_group_size=1, threshold_road_not_road=0)
 
 
             # metrics model raw
@@ -152,16 +151,16 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
             batch_patch_f1.append(patch_f1_fn(y_hat=y_hat, y=y))
 
             # metrics model postprocessed
-            loss = loss_fn(y_hat_post_processed, y)
-            if SELECTED_MODEL == 'segformer': y_hat = torch.sigmoid(y_hat_post_processed)
-            val_predictions.append(y_hat_post_processed.detach().cpu())
-            losses.append(loss.item())
-            batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat_post_processed, y=y))
-            batch_iou.append(iou_fn(y_hat=y_hat_post_processed, y=y))
-            batch_precision.append(precision_fn(y_hat=y_hat_post_processed, y=y))
-            batch_recall.append(recall_fn(y_hat=y_hat_post_processed, y=y))
-            batch_f1.append(f1_fn(y_hat=y_hat_post_processed, y=y))
-            batch_patch_f1.append(patch_f1_fn(y_hat=y_hat_post_processed, y=y))
+            loss_post_processed = loss_fn(y_hat_post_processed, y)
+            if SELECTED_MODEL == 'segformer': y_hat_post_processed = torch.sigmoid(y_hat_post_processed)
+            val_predictions_p.append(y_hat_post_processed.detach().cpu())
+            losses_p.append(loss_post_processed.item())
+            batch_patch_acc_p.append(patch_accuracy_fn(y_hat=y_hat_post_processed, y=y))
+            batch_iou_p.append(iou_fn(y_hat=y_hat_post_processed, y=y))
+            batch_precision_p.append(precision_fn(y_hat=y_hat_post_processed, y=y))
+            batch_recall_p.append(recall_fn(y_hat=y_hat_post_processed, y=y))
+            batch_f1_p.append(f1_fn(y_hat=y_hat_post_processed, y=y))
+            batch_patch_f1_p.append(patch_f1_fn(y_hat=y_hat_post_processed, y=y))
 
 
         print("----------Model raw metrics----------")
@@ -184,7 +183,8 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
         if DEBUG:
             # For debugging purposes : display the validation samples used for validation
             show_val_samples(torch.cat(val_samples, dim=0), torch.cat(ground_truths, dim=0), torch.cat(val_predictions, dim=0))
-
+            show_val_samples(torch.cat(val_samples, dim=0), torch.cat(ground_truths, dim=0), torch.cat(val_predictions_p, dim=0))
+            show_only_labels(torch.cat(val_predictions, dim=0), torch.cat(val_predictions_p, dim=0), torch.cat(ground_truths, dim=0))
 
 if __name__ == "__main__":
     postprocessing_pipeline()
