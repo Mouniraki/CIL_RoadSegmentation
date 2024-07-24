@@ -221,4 +221,6 @@ def main():
                 write_png(input=t, filename=f'{INFERENCE_FOLDER}/{INFERENCE_FILE_PREFIX}_{img_idx}.png')
                 img_idx += 1
 
-main()
+
+if __name__ == "__main__":
+    main()
