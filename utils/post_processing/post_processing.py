@@ -23,14 +23,6 @@ class PostProcessing:
         width = pred.shape[3]
         raise NotImplementedError
 
-    def __label_connected_components(self, image):
-        assert image.ndim == 2, "Image should be a 2D tensor"
-        assert torch.all((image == 0.0) | (image == 1.0)), "Image should be binary with values 0 and 1"
-
-        labels = labels[1:-1, 1:-1]
-        unique_labels, new_labels = torch.unique(labels, return_inverse=True)
-        labeled_image = new_labels.reshape(labels.shape)
-        return labeled_image
 
     # idea downscale
     # filter isolated
@@ -137,35 +129,37 @@ class PostProcessing:
 
     '''
     All patch around are part of a road 
-    Each road is a ground containing all patch part of it and its size
+    Each road is a ground containing all pixel touching in it
     For each group find clothes group (pair of group distance -> pairwise distance between each element of both group take the smallest)
-    Remember where the shortest distance came from and call extend_road_between_points -> merge the two group 
+    For the two group with the shortest distance between them, if this distance is smaller than max_dist then connect the two group by adding the shortest possible road to connect the two 
     Do this for all group 
-    If the shortest distance between two group is bigger than a threshold and the group is smaller than a threshold remove the small group
+    Remove group that are too small
+    @param downsample : specify the diminished resolution at which the method works 
+    @param max_dist : specify the maximum distance between the two groups (border touching - isolated to be considered touching)
+    @param min_group_size : minimum size of a road prediction that is not filtered out as being considered a wrong prediction
+    @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
-
-    def connect_roads(self, mask_connect_road, downsample=2, max_dist=25, min_group_size=1, threshold_road_not_road=0):
+    def connect_roads(self, mask_connect_roads, downsample=2, max_dist=25, min_group_size=1, threshold_road_not_road=0):
         assert min_group_size >= 1 and max_dist >= 1
-        negative_confidence = mask_connect_road.min().item()
-        positive_confidence = mask_connect_road.max().item()
+        negative_confidence, positive_confidence = mask_connect_roads.min().item(), mask_connect_roads.max().item()
         m = nn.AvgPool2d(downsample, stride=downsample)
-        mask_connect_road = m(mask_connect_road) >= threshold_road_not_road
-        batch_size = mask_connect_road.shape[0]
-        height = mask_connect_road.shape[2]
-        width = mask_connect_road.shape[3]
+        mask_connect_roads = m(mask_connect_roads) >= threshold_road_not_road
+        batch_size = mask_connect_roads.shape[0]
+        height = mask_connect_roads.shape[2]
+        width = mask_connect_roads.shape[3]
 
-        mask_connect_road_padded = F.pad(mask_connect_road, (1, 1, 1, 1), mode='constant', value=0)
+        mask_connect_roads_padded = F.pad(mask_connect_roads, (1, 1, 1, 1), mode='constant', value=0)
         biggest_label = (height + 2) * (width + 2) + 1
         labels = torch.arange(1, (height + 2) * (width + 2) + 1, dtype=torch.int32).reshape(height + 2,
                                                                                             width + 2).repeat(
-            batch_size, 1, 1, 1).to(DEVICE) * mask_connect_road_padded
+            batch_size, 1, 1, 1).to(DEVICE) * mask_connect_roads_padded
 
         #iterate until all touching pixel of road have the same value
         while True:
-            labels_with_road = (labels + ((~mask_connect_road_padded) * (biggest_label+10))).float() # the part where model predicted no road are thrown to ifinity such that the min pulling doesn't merge a road group with it
+            labels_with_road = (labels + ((~mask_connect_roads_padded) * (biggest_label+10))).float() # the part where model predicted no road are thrown to ifinity such that the min pulling doesn't merge a road group with it
             m = nn.MaxPool2d(3, stride=1, padding=1) # take neighbouring pixel, doesn't reduce spatial dimension, per default negative infinity on the side
             new_labels = -m(-labels_with_road)
-            new_labels *= mask_connect_road_padded # not road stay not road ignore road label we previously gave
+            new_labels *= mask_connect_roads_padded # not road stay not road ignore road label we previously gave
             if torch.equal(labels, new_labels):
                 break
             labels = new_labels
@@ -185,262 +179,54 @@ class PostProcessing:
         return result
 
 
-algos_and_params = {
-    'mask_connected_though_border_radius': {
-        'algorithm': 'mask_connected_though_border_radius',
-        'radius': 3},
-    'extend_path_to_closest': {
-        'algorithm': 'extend_path_to_closest'},
-    'connect_road': {
-        'algorithm': 'connect_road',
-        'max_dist': 25,
-        'min_group_size': 8}
-}
+    '''
+    This method filter out of the mask every pixel that are not though other pixel connected to a border of the image 
+    @param downsample : specify the diminished resolution at which the method works 
+    @param contact_radius : specify the maximum distance between the two groups (border touching - isolated to be considered touching)
+    @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
+    '''
+    def mask_connected_though_border_radius(self, mask_connect_roads, downsample=2, contact_radius=3, threshold_road_not_road=0):
+        assert contact_radius >= 1 and contact_radius % 2 == 1
+        negative_confidence, positive_confidence = mask_connect_roads.min().item(), mask_connect_roads.max().item()
+        m = nn.AvgPool2d(downsample, stride=downsample)
+        mask_connect_roads = (m(mask_connect_roads) >= threshold_road_not_road).float()
+        batch_size = mask_connect_roads.shape[0]
+        height = mask_connect_roads.shape[2]
+        width = mask_connect_roads.shape[3]
+
+        labels = F.pad(mask_connect_roads, (1, 1, 1, 1), mode='constant', value=10.) # outside border are given value 10
+        mask_connect_roads_padded = F.pad(mask_connect_roads, (1, 1, 1, 1), mode='constant', value=1)
+
+        # iterate until all touching pixel of road have the same value
+        while True:
+            m = nn.MaxPool2d(contact_radius, stride=1, padding=((contact_radius-1)//2))  # take neighbouring pixel, doesn't reduce spatial dimension, per default negative infinity on the side
+            new_labels = m(labels) # propagate the border value which is bigger than the rest  to road within radius
+            new_labels *= mask_connect_roads_padded  # not road stay not road
+            if torch.equal(labels, new_labels):
+                break
+            labels = new_labels
+
+        mask_connect_roads_padded = (labels==10) # keep only road which exit the image (connected to a border)
+        mask_connect_roads_padded = (mask_connect_roads_padded != 0)*positive_confidence + (mask_connect_roads_padded == 0)*negative_confidence # reorder as the model 0 -> negative, 1 -> positiv (take maximum confidence after postprocessing
+        mask_connect_roads_padded = mask_connect_roads_padded[:,:,1:-1,1:-1] # remove the oustide border padding we added
+        m = nn.Upsample(scale_factor=downsample, mode='nearest')
+        mask_connect_roads_padded = m(mask_connect_roads_padded) # reverse downsampling
+
+        return mask_connect_roads_padded
 
 
-def coord_to_array(w, h):
-    if w < 0 or h < 0 or h >= HEIGHT or w >= WIDTH:
-        raise IndexError
-
-    return w + h * 25
 
 
-def mask_connected_though_border_radius(model_out_mask, params):
-    radius = params['radius']
-    mask_connected_though_border_radius_model_out_mask = model_out_mask.copy()
-    assert WIDTH == HEIGHT
-    queue_border = deque()
-    for wh in range(HEIGHT):
-        if mask_connected_though_border_radius_model_out_mask[coord_to_array(wh, 0)] == 1:
-            queue_border.append((wh, 0))
-            mask_connected_though_border_radius_model_out_mask[
-                coord_to_array(wh, 0)] = 2  # 2 = connected to border and discovered
-        elif mask_connected_though_border_radius_model_out_mask[coord_to_array(wh, HEIGHT - 1)] == 1:
-            queue_border.append((wh, HEIGHT - 1))
-            mask_connected_though_border_radius_model_out_mask[coord_to_array(wh, HEIGHT - 1)] = 2
-        elif mask_connected_though_border_radius_model_out_mask[coord_to_array(0, wh)] == 1:
-            queue_border.append((0, wh))
-            mask_connected_though_border_radius_model_out_mask[coord_to_array(0, wh)] = 2
-        elif mask_connected_though_border_radius_model_out_mask[coord_to_array(WIDTH - 1, wh)] == 1:
-            queue_border.append((WIDTH - 1, wh))
-            mask_connected_though_border_radius_model_out_mask[coord_to_array(WIDTH - 1, wh)] = 2
-    while queue_border:
-        w, h = queue_border.popleft()
-        for i in range(-radius, radius):
-            for j in range(-radius, radius):
-                if 0 <= w + i < WIDTH and 0 <= h + j < HEIGHT and mask_connected_though_border_radius_model_out_mask[
-                    coord_to_array(w + i, h + j)] == 1:
-                    queue_border.append((w + i, h + j))
-                    mask_connected_though_border_radius_model_out_mask[coord_to_array(w + i, h + j)] = 2
-    return mask_connected_though_border_radius_model_out_mask == 2
 
 
-def find_closest(mask_extended_road, w, h):
-    assert WIDTH == HEIGHT
-
-    sorted_radius_coord = sorted(zip(range(WIDTH // 2), range(HEIGHT // 2)),
-                                 key=lambda coord: (coord[0] ** 2) + (coord[1] ** 2))[1:]
-
-    for i, j in sorted_radius_coord:
-        try:
-            array_index = coord_to_array(i, j)
-            if mask_extended_road[array_index] == 1:
-                return (i, j)
-        except IndexError:
-            continue  # the index is out of the current frame no road can exist there
-    return None
 
 
-def homogenoeus_mix_list(list1, list2):
-    if len(list1) == 0: return list2
-    if len(list2) == 0: return list1
-    if len(list1) < len(list2):
-        list3 = list1
-        list1 = list2
-        list2 = list3
-
-    interval = len(list1) // (len(list2))
-
-    result = []
-    for i in range(0, len(list1), interval):
-        result.extend(list1[i:i + interval])
-        if len(list2) > 0:
-            result.append(list2.pop(0))
-    return result
 
 
-def extend_road_between_points(mask_extended_road, w1, h1, w2, h2):
-    nbr_step_horizontal = abs(w2 - w1)
-    nbr_step_up = abs(h2 - h1)
-    step_direction_horizontal = 1 if w2 >= w1 else -1
-    step_direction_up = 1 if h2 >= h1 else -1
-
-    common_step = min(nbr_step_horizontal, nbr_step_up)
-
-    common_steps = [(step_direction_horizontal, step_direction_up)] * common_step
-
-    jump_nbr = abs(nbr_step_up - nbr_step_horizontal)
-    jump_step = (0, 0)
-    if nbr_step_up < nbr_step_horizontal:
-        jump_step = (step_direction_horizontal, 0)
-    elif nbr_step_up > nbr_step_horizontal:
-        jump_step = (0, step_direction_up)
-    jump_steps = [jump_step] * jump_nbr
-
-    sequence_of_step = homogenoeus_mix_list(common_steps, jump_steps)
-
-    coord_w, coord_h = w1, h1
-    new_road_points = []
-    for step in sequence_of_step:
-        coord_w += step[0]
-        coord_h += step[1]
-        try:
-            array_index = coord_to_array(coord_w, coord_h)
-            mask_extended_road[array_index] = 1
-            new_road_points.append((coord_w, coord_h))
-        except IndexError:
-            continue  # the index is out of the current frame no road can exist there
-    assert coord_w == w2 and coord_h == h2
-    return mask_extended_road, new_road_points
 
 
-def merge_group(road_networks, w1, h1, w2, h2):
-    if (w2, h2) not in road_networks:
-        road_networks[(w2, h2)] = road_networks[(w1, h1)]
-        return road_networks
-    else:
-        old_group_id = road_networks[(w1, h1)]
-        new_group_id = road_networks[(w2, h2)]
-        return {k: (new_group_id if v == old_group_id else v) for k, v in road_networks.items()}
 
 
-'''
-All patch around are part of a road 
-Each road is a ground containing all patch part of it and its size
-For each group find clothes group (pair of group distance -> pairwise distance between each element of both group take the smallest)
-Remember where the shortest distance came from and call extend_road_between_points -> merge the two group 
-Do this for all group 
-If the shortest distance between two group is bigger than a threshold and the group is smaller than a threshold remove the small group
-'''
 
 
-def connect_road(model_out_mask, params):
-    max_dist = params['max_dist']
-    min_group_size = params['min_group_size']
-    assert min_group_size >= 1 and max_dist >= 1
-    mask_connect_road = model_out_mask.copy()
-    road_networks = {}  # (w,h) -> group_id
 
-    # add all border as a group to which a road can be connected -> wihtout was giving good result
-    for wh in range(0, WIDTH):
-        road_networks[(-1, wh)] = 1
-        road_networks[(WIDTH, wh)] = 1
-        road_networks[(wh, -1)] = 1
-        road_networks[(wh, HEIGHT)] = 1
-
-    #find all subnetwork of road
-    next_availible_id = 2
-    for w in range(WIDTH):
-        for h in range(HEIGHT):
-            array_index = coord_to_array(w, h)
-            if mask_connect_road[array_index] != 1:
-                continue
-            for coord in [(w + 1, h), (w + 1, h + 1), (w, h + 1)]:
-                try:
-                    array_index = coord_to_array(coord[0], coord[1])
-                    if mask_connect_road[array_index] == 1:
-                        if (w, h) not in road_networks:
-                            road_networks[(w, h)] = next_availible_id
-                            next_availible_id += 1
-                        merge_group(road_networks, w, h, coord[0], coord[1])
-                except IndexError:
-                    continue  # the index is out of the current frame no road can exist there
-    # Organize coordinates by their network ID
-    subnetworks = [[] for _ in range(next_availible_id)]
-    for coord, network_id in sorted(road_networks.items()):
-        subnetworks[network_id - 1].append(coord)
-
-    subnetworks = list(filter(lambda net: len(net) >= min_group_size, subnetworks))
-
-    # connect all subnetwork by computing for each pair of group the start and end of the closest connection between them
-    subnetworks = sorted(subnetworks, key=len)
-    while len(subnetworks) > 1:
-        group_to_merge = subnetworks[0]
-        current_min = np.inf
-        min_group2 = None
-        min_group1_coord = (None, None)
-        min_group2_coord = (None, None)
-
-        for group_id in range(1, len(subnetworks)):
-            target_group = subnetworks[group_id]
-            distances = cdist(group_to_merge, target_group)
-            min_index = np.argmin(distances)
-            i, j = np.unravel_index(min_index, distances.shape)
-            if distances[i, j] < current_min:
-                current_min = distances[i, j]
-                min_group2 = group_id
-                min_group1_coord = group_to_merge[i]
-                min_group2_coord = target_group[j]
-
-        if current_min < max_dist:
-            mask_connect_road, new_road_points = extend_road_between_points(mask_connect_road, min_group1_coord[0],
-                                                                            min_group1_coord[1], min_group2_coord[0],
-                                                                            min_group2_coord[1])
-            subnetworks[min_group2].extend(new_road_points)
-            subnetworks[min_group2].extend(group_to_merge)
-            subnetworks = subnetworks[1:]
-        else:
-            # we simply remove the smallest group and consider it as a wrong prediction
-            if len(group_to_merge) < len(subnetworks[min_group2]):
-                subnetworks = subnetworks[1:]
-            else:
-                subnetworks = subnetworks[:min_group2] + subnetworks[min_group2 + 1:]
-
-    return mask_connect_road
-
-
-def extend_path_to_closest(model_out_mask, params):
-    mask_extended_road = model_out_mask.copy()
-    assert WIDTH == HEIGHT
-    for w in range(WIDTH):
-        for h in range(HEIGHT):
-            try:
-                if mask_extended_road[coord_to_array(w, h)] == 1:
-                    clossest_road = find_closest(mask_extended_road, w, h)
-                    if clossest_road is not None:
-                        mask_extended_road = extend_road_between_points(mask_extended_road, w, h, clossest_road[0],
-                                                                        clossest_road[1])
-            except IndexError:
-                continue
-
-    return mask_extended_road
-
-
-def patch_postprocessing(patch_postprocessing_label, algo_and_params=None):
-    patch_postprocessing_label_return = []
-    nbr_img = patch_postprocessing_label.size // (25 * 25)
-    for i_img in range(nbr_img):
-        if algo_and_params['algorithm'] == 'mask_connected_though_border_radius':
-            patch_postprocessing_label_return = np.append(patch_postprocessing_label_return,
-                                                          mask_connected_though_border_radius(
-                                                              patch_postprocessing_label[
-                                                              i_img * 25 * 25:(i_img + 1) * 25 * 25], algo_and_params))
-        elif algo_and_params['algorithm'] == 'extend_path_to_closest':
-            raise NotImplementedError
-            patch_postprocessing_label_return = np.append(patch_postprocessing_label_return,
-                                                          extend_path_to_closest(patch_postprocessing_label[
-                                                                                 i_img * 25 * 25:(i_img + 1) * 25 * 25],
-                                                                                 algo_and_params))
-        elif algo_and_params['algorithm'] == "connect_road":
-            patch_postprocessing_label_return = np.append(patch_postprocessing_label_return,
-                                                          connect_road(patch_postprocessing_label[
-                                                                       i_img * 25 * 25:(i_img + 1) * 25 * 25],
-                                                                       algo_and_params))
-
-    return patch_postprocessing_label_return
-    fig, axs = plt.subplots(h_patches, w_patches, figsize=figsize)
-    for i, (p, l) in enumerate(zip(patches, labels)):
-        # the np.maximum operation paints patches labeled as road red
-        axs[i // w_patches, i % w_patches].imshow(np.maximum(p, np.array([l.item(), 0., 0.])))
-        axs[i // w_patches, i % w_patches].set_axis_off()
-    plt.show()
