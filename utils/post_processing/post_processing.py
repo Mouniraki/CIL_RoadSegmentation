@@ -5,30 +5,19 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.nn import MaxPool2d
+import torchvision
+import torchvision.transforms as T
 
 WIDTH, HEIGHT = 25, 25
 DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
 
 
 class PostProcessing:
-    ''''
-    postprocessing_patch_size : represent the downscale factor
-    '''
+
 
     def __init__(self, postprocessing_patch_size=16):
         self.postprocessing_patch_size = postprocessing_patch_size
 
-    def filter_isolated_patches(self, pred, max_distance):
-        height = pred.shape[2]
-        width = pred.shape[3]
-        raise NotImplementedError
-
-
-    # idea downscale
-    # filter isolated
-    # connect all together
-    # blur
-    # threshold
 
     def connect_road_segements(self, pred, downsample=8, max_dist=25, min_group_size=1):
         assert min_group_size >= 1 and max_dist >= 1
@@ -213,6 +202,13 @@ class PostProcessing:
         mask_connect_roads_padded = m(mask_connect_roads_padded) # reverse downsampling
 
         return mask_connect_roads_padded
+
+    def blurring_and_threshold(self, mask_connect_roads, kernel_size=7):
+        assert kernel_size % 2 == 1
+        m = nn.AvgPool2d(kernel_size, stride=1, padding=(kernel_size-1)//2)
+        mask_connect_roads_blurred = m(mask_connect_roads)
+        return mask_connect_roads_blurred
+
 
 
 
