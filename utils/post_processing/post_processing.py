@@ -144,13 +144,12 @@ class PostProcessing:
     If the shortest distance between two group is bigger than a threshold and the group is smaller than a threshold remove the small group
     '''
 
-    def connect_roads(self, mask_connect_road, downsample=2, max_dist=25, min_group_size=1,
-                      threshold_road_not_road=0):
+    def connect_roads(self, mask_connect_road, downsample=2, max_dist=25, min_group_size=1, threshold_road_not_road=0):
         assert min_group_size >= 1 and max_dist >= 1
         negative_confidence = mask_connect_road.min().item()
         positive_confidence = mask_connect_road.max().item()
         m = nn.AvgPool2d(downsample, stride=downsample)
-        mask_connect_road = m(mask_connect_road) >= threshold_road_not_roadgit
+        mask_connect_road = m(mask_connect_road) >= threshold_road_not_road
         batch_size = mask_connect_road.shape[0]
         height = mask_connect_road.shape[2]
         width = mask_connect_road.shape[3]
