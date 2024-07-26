@@ -1,12 +1,10 @@
 import numpy as np
-from collections import deque
 
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.nn import MaxPool2d
-import torchvision
-import torchvision.transforms as T
+
 
 WIDTH, HEIGHT = 25, 25
 DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
@@ -114,7 +112,7 @@ class PostProcessing:
                 break # avoid writing the end coordinate
 
             result_coordinate = torch.cat([result_coordinate, torch.tensor([[x1, y1]])])
-        return result_coordinate
+        return result_coordinate.to(DEVICE)
 
     '''
     All patch around are part of a road 
@@ -129,7 +127,7 @@ class PostProcessing:
     @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
     def connect_roads(self, mask_connect_roads, downsample=2, max_dist=25, min_group_size=1, threshold_road_not_road=0):
-        assert min_group_size >= 1 and max_dist >= 1
+        assert min_group_size >= 1 and max_dist >= 1 and downsample>=1
         negative_confidence, positive_confidence = mask_connect_roads.min().item(), mask_connect_roads.max().item()
         m = nn.AvgPool2d(downsample, stride=downsample)
         mask_connect_roads = m(mask_connect_roads) >= threshold_road_not_road
@@ -175,7 +173,7 @@ class PostProcessing:
     @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
     def mask_connected_though_border_radius(self, mask_connect_roads, downsample=2, contact_radius=3, threshold_road_not_road=0):
-        assert contact_radius >= 1 and contact_radius % 2 == 1
+        assert contact_radius >= 1 and contact_radius % 2 == 1 and downsample>=1
         negative_confidence, positive_confidence = mask_connect_roads.min().item(), mask_connect_roads.max().item()
         m = nn.AvgPool2d(downsample, stride=downsample)
         mask_connect_roads = (m(mask_connect_roads) >= threshold_road_not_road).float()
@@ -203,17 +201,92 @@ class PostProcessing:
 
         return mask_connect_roads_padded
 
-    def blurring_and_threshold(self, mask_connect_roads, kernel_size=7):
+    def blurring_averaging(self, mask_connect_roads, kernel_size=7):
         assert kernel_size % 2 == 1
         m = nn.AvgPool2d(kernel_size, stride=1, padding=(kernel_size-1)//2)
         mask_connect_roads_blurred = m(mask_connect_roads)
         return mask_connect_roads_blurred
 
+    '''
+    (Warning this method is very slow! -> She wasn't showing real improvement to the model performance so we kept it like this.)
+    The goal of this function is to remove every gaps between close pixel by connecting every pixels distanciated by less than distance_max directly by the shortest path to each other
+    @param downsample : specify the diminished resolution at which the method works 
+    @param distance_max : distance below one to pixel should be connected by there shortest path to each other
+    @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
+    '''
+    def connect_all_close_pixels(self,mask_connect_roads, downsample=2, distance_max=10, threshold_road_not_road=0):
+        assert distance_max >= 1 and downsample >= 1
+        negative_confidence, positive_confidence = mask_connect_roads.min().item(), mask_connect_roads.max().item()
+        m = nn.AvgPool2d(downsample, stride=downsample)
+        mask_connect_roads = (m(mask_connect_roads) >= threshold_road_not_road).float()
+        batch_size = mask_connect_roads.shape[0]
+        height = mask_connect_roads.shape[2]
+        width = mask_connect_roads.shape[3]
 
+        result = torch.zeros((0, 1, height, width)).to(DEVICE)
 
+        for b in range(batch_size):
+            mask_connect_road = mask_connect_roads[b, 0, :, :]
+            road_coordinates = mask_connect_road.nonzero(as_tuple=False).float() # extract coordinate of all road pixels
 
+            acc_result = torch.empty((0, 2)).to(DEVICE)
+            acc_result = torch.cat([acc_result, road_coordinates], dim=0)
 
+            for road_coordinate in road_coordinates:
+                candidate_road_coordinates = road_coordinates[(road_coordinates[:, 0] <= road_coordinate[0]+distance_max) * (road_coordinates[:, 0] >= road_coordinate[0]) * (road_coordinates[:, 1] >= road_coordinate[1]) * (road_coordinates[:, 1] <= road_coordinate[1]+distance_max)] #look only down, right -> up, left connection are made from upper, left road pixels
+                for candidate_road_coordinate in candidate_road_coordinates:
+                    dist = torch.norm(road_coordinate-candidate_road_coordinate)
+                    if dist <= distance_max and dist>1: #alraedy neighbooring pixel are ignored no road needed to connect them
+                        added_coordinates = self.__cordinates_between_points(road_coordinate, candidate_road_coordinate)
+                        acc_result = torch.cat([acc_result, added_coordinates], dim=0)
+            acc_result = torch.unique(acc_result, sorted=False, return_inverse=False, return_counts=False, dim=0)
 
+            mask_connect_road = torch.zeros(mask_connect_road.shape).to(DEVICE)
+            for point in acc_result.long():
+                mask_connect_road[point[0], point[1]] = 1
+
+            result = torch.cat([result, mask_connect_road.unsqueeze(0).unsqueeze(0)], dim=0)
+
+        m = nn.Upsample(scale_factor=downsample, mode='nearest')
+        result = m(result)  # reverse downsampling
+
+        return result
+
+    '''
+    Not tested, not enough GPU memory
+    '''
+    def __connect_all_close_pixels_out_cuda_memory(self,mask_connect_roads, downsample=2, distance_max=10, threshold_road_not_road=0):
+        assert distance_max >= 1 and downsample >= 1
+        negative_confidence, positive_confidence = mask_connect_roads.min().item(), mask_connect_roads.max().item()
+        m = nn.AvgPool2d(downsample, stride=downsample)
+        mask_connect_roads = (m(mask_connect_roads) >= threshold_road_not_road).float()
+        batch_size = mask_connect_roads.shape[0]
+        height = mask_connect_roads.shape[2]
+        width = mask_connect_roads.shape[3]
+
+        result = torch.zeros((0, 1, height, width)).to(DEVICE)
+
+        for b in range(batch_size):
+            mask_connect_road = mask_connect_roads[b, 0, :, :]
+            road_coordinates = mask_connect_road.nonzero(as_tuple=False).float() # extract coordinate of all road pixels
+            distances = torch.cdist(road_coordinates, road_coordinates, p=2.0)  #distance between all road pixel
+            pair_of_close_road_pixel = (distances <= distance_max).nonzero(as_tuple=False)
+            acc_result = torch.empty((0, 2))
+            acc_result = torch.cat([acc_result, road_coordinates], dim=0)
+            for (b, _, x, y) in pair_of_close_road_pixel:
+                if x >= y: continue # we connect p1 to p2, but no need to then connect p2 to p1
+                added_coordinates = self.__cordinates_between_points(road_coordinates[x], road_coordinates[y])
+                acc_result = torch.cat([acc_result, added_coordinates], dim=0)
+
+            acc_result = torch.unique(acc_result, sorted=False, return_inverse=False, return_counts=False)
+
+            mask_connect_road = torch.zeros(mask_connect_road.shape).to(DEVICE)
+            for point in acc_result.long():
+                mask_connect_road[point[0], point[1]] = 1
+
+            result = torch.cat([result, mask_connect_road], dim=0)
+
+        return result
 
 
 

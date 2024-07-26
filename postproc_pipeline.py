@@ -135,9 +135,9 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
             #pass the prediction though the postprocessing module
             postprocessing = PostProcessing(postprocessing_patch_size=16)
-            y_hat_post_processed = postprocessing.connect_roads(y_hat, downsample=1, max_dist=25, min_group_size=1, threshold_road_not_road=0)
-            #y_hat_post_processed = postprocessing.mask_connected_though_border_radius(y_hat, downsample=2, contact_radius=3, threshold_road_not_road=0)
-            #y_hat_post_processed = postprocessing.blurring_and_threshold(y_hat, kernel_size=7)
+            # y_hat_post_processed = postprocessing.mask_connected_though_border_radius(y_hat, downsample=2, contact_radius=3, threshold_road_not_road=0)
+            #y_hat_post_processed = postprocessing.connect_roads(y_hat, downsample=1, max_dist=25, min_group_size=1, threshold_road_not_road=0)
+            y_hat_post_processed = postprocessing.connect_all_close_pixels(y_hat, downsample=2, distance_max=7, threshold_road_not_road=0)
 
             # metrics model raw
             loss = loss_fn(y_hat, y)
@@ -185,7 +185,11 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
             # For debugging purposes : display the validation samples used for validation
             show_val_samples(torch.cat(val_samples, dim=0), torch.cat(ground_truths, dim=0), torch.cat(val_predictions, dim=0))
             show_val_samples(torch.cat(val_samples, dim=0), torch.cat(ground_truths, dim=0), torch.cat(val_predictions_p, dim=0))
-            show_only_labels(torch.cat(val_predictions, dim=0), torch.cat(val_predictions_p, dim=0), torch.cat(ground_truths, dim=0))
+            show_only_labels(torch.cat(val_predictions, dim=0)[:5], torch.cat(val_predictions_p, dim=0)[:5], torch.cat(ground_truths, dim=0)[:5])
+            show_only_labels(torch.cat(val_predictions, dim=0)[5:10], torch.cat(val_predictions_p, dim=0)[5:10], torch.cat(ground_truths, dim=0)[5:10])
+            show_only_labels(torch.cat(val_predictions, dim=0)[10:15], torch.cat(val_predictions_p, dim=0)[10:15], torch.cat(ground_truths, dim=0)[10:15])
+            show_only_labels(torch.cat(val_predictions, dim=0)[15:20], torch.cat(val_predictions_p, dim=0)[15:20], torch.cat(ground_truths, dim=0)[15:20])
+            show_only_labels(torch.cat(val_predictions, dim=0)[20:25], torch.cat(val_predictions_p, dim=0)[20:25], torch.cat(ground_truths, dim=0)[20:25])
 
 if __name__ == "__main__":
     postprocessing_pipeline()
