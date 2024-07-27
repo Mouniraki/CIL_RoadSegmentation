@@ -10,3 +10,5 @@
 23-07-2024_11-20-54 -> K-Fold cross-validation with K=5, 1 pass transforms, DiceLoss | Best epochs:[40, 25, 32, 44, 24]
 23-07-2024_12-24-26 -> K-Fold cross-validation with K=5, 5 pass transform (data augmentation), BCELoss | Best epochs:[14, 17, 10, 12, 13]
 23-07-2024_14-51-05 -> K-Fold cross-validation with K=5, 5 pass transform (data augmentation), DiceLoss | Best epochs:[16, 35, 27, 19, 34]
+
+27-07-2024_11-33-48 -> Refinement model trained weights

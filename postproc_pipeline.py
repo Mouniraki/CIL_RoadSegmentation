@@ -53,7 +53,7 @@ INFERENCE_FILE_PREFIX = 'satimage'
 N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
 #Refinement model
-REFINEMENT = True
+REFINEMENT = False
 PRETRAIN_REFINEMENT_PATH = "utils/models/refinement_weights2"
 
 # Function for postprocessing experimentations based on the best model trained so far (see description.txt for more information)
@@ -168,7 +168,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                     y = y.to(DEVICE)
                     
                     y_int = torch.stack([m(x) for m in models]).mean(dim=0)
-                    y_int = torch.sigmoid(y_hat)
+                    y_int = torch.sigmoid(y_int)
                     y_hat = refinement_model(y_int)
                     loss = refinement_loss(y_hat, y)
 
