@@ -24,8 +24,8 @@ from utils.metrics import patch_accuracy_fn, iou_fn, precision_fn, recall_fn, f1
 from utils.post_processing.post_processing import PostProcessing
 
 # To select the proper hardware accelerator
-#DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
-DEVICE = 'cpu'
+DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+
 # Constants
 PATCH_SIZE = 16
 CUTOFF = 0.25
