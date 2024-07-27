@@ -53,8 +53,10 @@ INFERENCE_FILE_PREFIX = 'satimage'
 N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
 #Refinement model
-REFINEMENT = False
+REFINEMENT_TRAINING = False
+REFINEMENT = True
 PRETRAIN_REFINEMENT_PATH = "utils/models/refinement_weights2"
+REFINEMENT_PATH = ""
 
 # Function for postprocessing experimentations based on the best model trained so far (see description.txt for more information)
 def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type: str = 'diceloss', n_models: int = 5, best_epochs: list[int] = [16, 35, 27, 19, 34]):
@@ -99,11 +101,14 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
         else:
             loss_fn = torch.nn.BCEWithLogitsLoss()
 
-        if REFINEMENT:
+        if REFINEMENT or REFINEMENT_TRAINING:
             refinement_model = UNet(channels=(1, 64, 128, 256, 512, 1024))
-            refinement_model.load_state_dict(torch.load(PRETRAIN_REFINEMENT_PATH))
-            refinement_loss = DiceLoss(model = "refinement") #so that the loss does not do sigmoid
-            refinement_optimizer = torch.optim.AdamW(refinement_model.parameters(), lr=LR)
+            if REFINEMENT_TRAINING:
+                refinement_model.load_state_dict(torch.load(PRETRAIN_REFINEMENT_PATH))
+                refinement_loss = DiceLoss(model = "refinement") #so that the loss does not do sigmoid
+                refinement_optimizer = torch.optim.AdamW(refinement_model.parameters(), lr=LR)
+            else:
+                refinement_model.load_state_dict(torch.load(REFINEMENT_PATH))
     else:
         model = UNet()
         if loss_type == 'diceloss':
@@ -123,7 +128,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
 
     #Refinement model fine-tuning
-    if REFINEMENT:
+    if REFINEMENT_TRAINING:
         print("Start Refinement training")
         train_dataset, val_dataset = random_split(images_dataset, [0.8, 0.2])
         train_dataloader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, num_workers=N_WORKERS, shuffle=True)
@@ -221,7 +226,6 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                     break
     
     print("Refinement training finished")
-    # TODO SAVE WEIGHTS
     
     refinement_model.eval()
     with torch.no_grad():
