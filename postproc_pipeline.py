@@ -58,9 +58,9 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
     checkpoints_folder = f"checkpoints/{folder_name}"
 
     if len(best_epochs) != n_models:
-        return "Error: the array of best models does not match the number of models specified."
-
-
+        print("Error: the array of best models does not match the number of models specified.")
+        return
+    
     # # Initializing Tensorboard
     # writer = SummaryWriter(log_dir=f"valid_{TENSORBOARD_FOLDER}")
     
