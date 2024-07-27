@@ -2,3 +2,4 @@ dataset/
 tensorboard/
 predictions/
 checkpoints/
+__pycache__/
