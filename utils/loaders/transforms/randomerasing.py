@@ -10,7 +10,7 @@ class RandomErasing:
         
     def __call__(self, input: torch.Tensor, target: torch.Tensor | None):
         transform = v2.Compose([
-            v2.RandomErasing(p=self.p, scale=self.scale, ratio= self.ratio)
+            v2.RandomErasing(p=self.p, scale=self.scale, ratio= self.ratio, value='random')
         ])
 
         input = transform(input)
