@@ -114,6 +114,8 @@ def main():
         losses = [] # To record metric
         # Perform data augmentation by re-feeding n times the training dataset with random transformations each time
         for n_a in range(args.n_augmentation):
+            #random_sampler = RandomSampler(train_dataloader.dataset, replacement=False, num_samples=400) # can be used to reduce load while using big dataset for testing
+            #sampler_dataloader = DataLoader(train_dataloader.dataset, sampler=random_sampler, batch_size=train_dataloader.batch_size)
             # For the progress bar (and to load the images from the mini-batch)
             progress_bar = tqdm(iterable=train_dataloader, desc=f"Epoch {epoch+1} / {args.n_epochs} <- Augmentation : {n_a+1} / {args.n_augmentation}")
             for (x, y) in progress_bar: # x = images, y = labels
