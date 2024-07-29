@@ -57,7 +57,7 @@ N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
 #Refinement model
 REFINEMENT_TRAINING = False
-REFINEMENT = True
+REFINEMENT = False
 PRETRAIN_REFINEMENT_PATH = "utils/models/refinement_weights2"
 REFINEMENT_PATH = ""
 
@@ -227,10 +227,11 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                 elif epoch - best_epoch >= EARLY_STOPPING_THRESHOLD:
                     print(f"Early stopped at epoch {epoch+1} with best epoch {best_epoch+1}")
                     break
-    
-    print("Refinement training finished")
-    
-    refinement_model.eval()
+
+
+    if REFINEMENT:
+        print("Refinement training finished")
+        refinement_model.eval()
     with torch.no_grad():
         # For debugging visualization
         val_samples, ground_truths, val_predictions, val_predictions_p = [], [], [], []
