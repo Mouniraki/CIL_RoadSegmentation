@@ -62,6 +62,7 @@ File structure of principal parts:
 ```
 dataset -> CIL_RoadSegmentation
 checkpoints -> CIL_RoadSegmentation
+finetuned3 -> utils/models
 ```
 2. Install dependencies
 
