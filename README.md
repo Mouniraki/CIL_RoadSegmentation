@@ -6,7 +6,7 @@
 
 File structure of principal parts:      
 
-
+```
 ├── checkpoints
 │ └── 23-07-2024_14-51-05           -> Contain the weights of our best model
 │ │ └── description.txt             -> describe the parameters used in training for each specific checkpoints
@@ -51,3 +51,4 @@ File structure of principal parts:
         ├── dummy_submission_good_score.csv
         ├── mask_to_submission.py -> Code given by Kaggle to convert our prediction to the format accepted by the platfrom
         └── submission_to_mask.py -> Code reverting a Kaggle submission to images
+```
