@@ -36,7 +36,7 @@ class PostProcessing:
             labels = labels_updated
         # extract the group of road patch
 
-    def _connect_road(self, mask_labeled_roads, max_dist, min_group_size):
+    def _connect_road(self, mask_labeled_roads, max_dist, min_group_size, fat):
 
         unique_labels = torch.unique(mask_labeled_roads, sorted=False, return_inverse=False) # 0 represent nothing in our array
         unique_labels = unique_labels[unique_labels != 0]
@@ -69,7 +69,7 @@ class PostProcessing:
                         min_group_coord1 = group1[i]
                         min_group_coord2 = group2[j]
             if current_min <= max_dist: # group are within max distance threshold from each other and can thus a path can be created between them else this postprocessing method bascially consider the pair already together
-                new_road_points = self.__cordinates_between_points(min_group_coord1, min_group_coord2).to(DEVICE)
+                new_road_points = self.__cordinates_between_points(min_group_coord1, min_group_coord2, fat=fat).to(DEVICE)
                 subnetworks[min_group_id1] = torch.cat([subnetworks[min_group_id1], new_road_points])
             subnetworks[min_group_id1] = torch.cat([subnetworks[min_group_id1], subnetworks[min_group_id2]])
             subnetworks.pop(min_group_id2)
@@ -79,17 +79,24 @@ class PostProcessing:
         mask_connect_road = torch.zeros(mask_labeled_roads.shape).to(DEVICE)
         for subnetwork in subnetworks:
             for point in subnetwork.long():
+                if point[0] < 0 or point[0] >= mask_connect_road.shape[0] or point[1] < 0 or point[1] >= mask_connect_road.shape[1]: continue
                 mask_connect_road[point[0], point[1]] = 1
 
         return mask_connect_road
 
     '''
     Following the principle of Bresenham's line algorithm'''
-    def __cordinates_between_points(self, p1, p2):
+    def __cordinates_between_points(self, p1, p2, fat=0):
+
+
+        fat_kernel = torch.tensor([[i, j] for i in range(-fat, fat) for j in range(-fat, fat)]).to(DEVICE)
+
+
+
         x1, y1 = p1[0].item(), p1[1].item()
         x2, y2 = p2[0].item(), p2[1].item()
 
-        result_coordinate = torch.empty((0, 2))
+        result_coordinate = torch.empty((0, 2)).to(DEVICE)
 
         dx, dy = abs(x2 - x1), abs(y2 - y1)
         step_x = 1 if x1 < x2 else -1
@@ -111,7 +118,9 @@ class PostProcessing:
             if x1 == x2 and y1 == y2:
                 break # avoid writing the end coordinate
 
-            result_coordinate = torch.cat([result_coordinate, torch.tensor([[x1, y1]])])
+            #result_coordinate = torch.cat([result_coordinate, torch.tensor([[x1, y1]])])
+            result_coordinate = torch.cat([result_coordinate, fat_kernel+torch.tensor([x1, y1]).to(DEVICE)])
+            result_coordinate = torch.unique(result_coordinate, sorted=False, return_inverse=False, return_counts=False, dim=0)
         return result_coordinate.to(DEVICE)
 
     '''
@@ -126,7 +135,7 @@ class PostProcessing:
     @param min_group_size : minimum size of a road prediction that is not filtered out as being considered a wrong prediction
     @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
-    def connect_roads(self, mask_connect_roads, downsample=2, max_dist=25, min_group_size=1, threshold_road_not_road=0):
+    def connect_roads(self, mask_connect_roads, downsample=2, max_dist=25, min_group_size=1, threshold_road_not_road=0, fat=2):
         assert min_group_size >= 1 and max_dist >= 1 and downsample>=1
         negative_confidence, positive_confidence = mask_connect_roads.min().item(), mask_connect_roads.max().item()
         m = nn.AvgPool2d(downsample, stride=downsample)
@@ -157,7 +166,7 @@ class PostProcessing:
 
         result = torch.empty((0, 1, height, width)).to(DEVICE)
         for i in range(batch_size):
-            connected_mask = self._connect_road(labels[i, 0, :, :], max_dist, min_group_size).unsqueeze(0).unsqueeze(0)
+            connected_mask = self._connect_road(labels[i, 0, :, :], max_dist, min_group_size, fat).unsqueeze(0).unsqueeze(0)
             connected_mask = connected_mask[:,:, 1:-1, 1:-1]# remove the border infinite road padding
             connected_mask = (connected_mask != 0)*positive_confidence + (connected_mask == 0)*negative_confidence# reorder as the model 0 -> negative, 1 -> positiv
             result = torch.cat([result, connected_mask], dim=0)

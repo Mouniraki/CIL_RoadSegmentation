@@ -19,7 +19,7 @@ from utils.models.segformer import SegFormer
 from utils.losses.diceloss import DiceLoss
 
 # Importing plot & metric utilities
-from utils.plotting import plot_patches, show_val_samples, show_only_labels
+from utils.plotting import plot_patches, show_val_samples, show_only_labels, save_postProcessing_effect
 from utils.metrics import patch_accuracy_fn, iou_fn, precision_fn, recall_fn, f1_fn, patch_f1_fn
 from utils.post_processing.post_processing import PostProcessing
 
@@ -49,6 +49,9 @@ TRAIN_DATASET_PATH = 'dataset/training'
 TEST_DATASET_PATH = 'dataset/test/images/'
 CHECKPOINTS_FILE_PREFIX = 'epoch'
 INFERENCE_FILE_PREFIX = 'satimage'
+ALGOPOSTPRCESSING = 'connect_roads'
+
+
 
 N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
@@ -135,9 +138,13 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
             #pass the prediction though the postprocessing module
             postprocessing = PostProcessing(postprocessing_patch_size=16)
-            # y_hat_post_processed = postprocessing.mask_connected_though_border_radius(y_hat, downsample=2, contact_radius=3, threshold_road_not_road=0)
-            y_hat_post_processed = postprocessing.connect_roads(y_hat, downsample=1, max_dist=25, min_group_size=1, threshold_road_not_road=0)
-            #y_hat_post_processed = postprocessing.connect_all_close_pixels(y_hat, downsample=2, distance_max=7, threshold_road_not_road=0)
+            match ALGOPOSTPRCESSING:
+                case 'mask_connected_though_border_radius':
+                    y_hat_post_processed = postprocessing.mask_connected_though_border_radius(y_hat, downsample=2, contact_radius=3, threshold_road_not_road=0)
+                case 'connect_roads':
+                    y_hat_post_processed = postprocessing.connect_roads(y_hat, downsample=1, max_dist=70, min_group_size=1, threshold_road_not_road=0, fat=6)
+                case 'connect_all_close_pixels':
+                    y_hat_post_processed = postprocessing.connect_all_close_pixels(y_hat, downsample=2, distance_max=7, threshold_road_not_road=0)
 
             # metrics model raw
             loss = loss_fn(y_hat, y)
@@ -183,13 +190,43 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
         if DEBUG:
             # For debugging purposes : display the validation samples used for validation
-            show_val_samples(torch.cat(val_samples, dim=0), torch.cat(ground_truths, dim=0), torch.cat(val_predictions, dim=0))
-            show_val_samples(torch.cat(val_samples, dim=0), torch.cat(ground_truths, dim=0), torch.cat(val_predictions_p, dim=0))
-            show_only_labels(torch.cat(val_predictions, dim=0)[:5], torch.cat(val_predictions_p, dim=0)[:5], torch.cat(ground_truths, dim=0)[:5])
-            show_only_labels(torch.cat(val_predictions, dim=0)[5:10], torch.cat(val_predictions_p, dim=0)[5:10], torch.cat(ground_truths, dim=0)[5:10])
-            show_only_labels(torch.cat(val_predictions, dim=0)[10:15], torch.cat(val_predictions_p, dim=0)[10:15], torch.cat(ground_truths, dim=0)[10:15])
-            show_only_labels(torch.cat(val_predictions, dim=0)[15:20], torch.cat(val_predictions_p, dim=0)[15:20], torch.cat(ground_truths, dim=0)[15:20])
-            show_only_labels(torch.cat(val_predictions, dim=0)[20:25], torch.cat(val_predictions_p, dim=0)[20:25], torch.cat(ground_truths, dim=0)[20:25])
+            save_postProcessing_effect(torch.cat(val_predictions, dim=0), torch.cat(val_predictions_p, dim=0), torch.cat(ground_truths, dim=0), title_prefix="postProcessing_result/"+'postProcessingResult', segmentation=False)
 
+
+
+
+
+    #############################
+    # Inference routine
+    #############################
+
+    print("Performing inference")
+    test_dataset = ImageDataset(
+        for_train=False,
+        images_dir = os.path.abspath(TEST_DATASET_PATH),
+        # img_size = (512, 512)
+    )
+    # We don't shuffle to keep the original data ordering
+    test_dataloader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=N_WORKERS, shuffle=False)
+
+    # Create a new folder for the predicted masks
+    os.makedirs(INFERENCE_FOLDER, exist_ok=True)
+
+    model.eval()
+    with torch.no_grad():
+        img_idx = 144 # Test images start at index 144
+        for x, _ in test_dataloader:
+            x = x.to(DEVICE)
+            pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
+            postprocessing = PostProcessing(postprocessing_patch_size=16)
+            pred = postprocessing.connect_roads(pred, downsample=1, max_dist=25, min_group_size=1, threshold_road_not_road=0).cpu()
+            if SELECTED_MODEL == 'segformer':
+                pred = torch.sigmoid(pred)
+            # Add channels to end up with RGB tensors, and save the predicted masks on disk
+            pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
+            for t in pred:
+                t = (t * 255).type(torch.uint8) # Rescale everything in the 0-255 range to generate channels for images
+                write_png(input=t, filename=f'{INFERENCE_FOLDER}/{INFERENCE_FILE_PREFIX}_{img_idx}.png')
+                img_idx += 1
 if __name__ == "__main__":
     postprocessing_pipeline()

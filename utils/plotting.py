@@ -81,3 +81,28 @@ def show_only_labels(y_hat, y_hat_post_processed, y, segmentation=False):
         axs[1, i].set_axis_off()
         axs[2, i].set_axis_off()
     plt.show()
+
+def save_postProcessing_effect(y_hat, y_hat_post_processed, y,title_prefix='postProcessingResult',  segmentation=False):
+    len_to_save = len(y_hat)
+    for block in range(0, len_to_save, 5):
+        end_index = min(len(y_hat), block + 5)
+        y_hat_to_draw = y_hat[block:end_index]
+        y_hat_post_processed_to_draw = y_hat_post_processed[block:end_index]
+        y_to_draw = y[block:end_index]
+        imgs_to_draw = len(y_hat_to_draw)
+        fig, axs = plt.subplots(3, imgs_to_draw, figsize=(18.5, 12))
+        for i in range(imgs_to_draw):
+            y_hat_i = (y_hat_to_draw[i, 0] - y_hat_to_draw[i, 0].min()) / (y_hat_to_draw[i, 0].max() - y_hat_to_draw[i, 0].min())
+            y_hat_post_processed_i = (y_hat_post_processed_to_draw[i, 0] - y_hat_post_processed_to_draw[i, 0].min()) / (
+                        y_hat_post_processed_to_draw[i, 0].max() - y_hat_post_processed_to_draw[i, 0].min())
+            y_i = (y_to_draw[i, 0] - y_to_draw[i, 0].min()) / (y_to_draw[i, 0].max() - y_to_draw[i, 0].min())
+            axs[0, i].imshow(y_hat_i)
+            axs[1, i].imshow(y_hat_post_processed_i)
+            axs[2, i].imshow(y_i)
+            axs[0, i].set_title(f'Predicted {i}')
+            axs[1, i].set_title(f'PostProcessed {i}')
+            axs[2, i].set_title(f'True {i}')
+            axs[0, i].set_axis_off()
+            axs[1, i].set_axis_off()
+            axs[2, i].set_axis_off()
+        plt.savefig(title_prefix+"  "+str(block)+'-'+str(end_index)+'.png')
