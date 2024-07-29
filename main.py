@@ -13,7 +13,7 @@ from utils.loaders.image_dataset import ImageDataset
 from utils.loaders.transforms import compose, rotation, colorjitter, randomerasing, randomresizedcrop
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
-from utils.losses.diceloss import DiceLoss, BorderDiceLoss, CombineLoss
+from utils.losses.loss import DiceLoss, BorderDiceLoss, CombineLoss
 
 # Importing plot & metric utilities
 from utils.plotting import plot_patches, show_val_samples

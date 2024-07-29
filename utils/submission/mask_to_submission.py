@@ -10,11 +10,11 @@ from absl import app, flags
 
 FLAGS = flags.FLAGS
 # Best submission with postprocessing
-#flags.DEFINE_string("submission_filename", "dummy_submission.csv", "The output csv for the submission.")
+#flags.DEFINE_string("submission_filename", "dummy_submission_good_score.csv", "The output csv for the submission.")
 #flags.DEFINE_string("base_dir", "../../predictions/27-07-2024_18-16-36", "The directory with the predicted masks.")
 #  submission with external dataset
-flags.DEFINE_string("submission_filename", "dummy_submission_externDataset.csv", "The output csv for the submission.")
-flags.DEFINE_string("base_dir", "../../predictions/28-07-2024_16-43-52", "The directory with the predicted masks.")
+flags.DEFINE_string("submission_filename", "23-07-2024_14-51-05_with_mask_connected_though_border_radius_3.csv", "The output csv for the submission.")
+flags.DEFINE_string("base_dir", "../../predictions/23-07-2024_14-51-05_with_mask_connected_though_border_radius_3", "The directory with the predicted masks.")
 
 
 

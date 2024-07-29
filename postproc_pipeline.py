@@ -16,7 +16,7 @@ from utils.loaders.image_dataset import ImageDataset
 from utils.loaders.transforms import compose, rotation, colorjitter, randomerasing, randomresizedcrop
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
-from utils.losses.diceloss import DiceLoss
+from utils.losses.loss import DiceLoss
 
 # Importing plot & metric utilities
 from utils.plotting import plot_patches, show_val_samples, show_only_labels, save_postProcessing_effect
@@ -49,7 +49,7 @@ TRAIN_DATASET_PATH = 'dataset/training'
 TEST_DATASET_PATH = 'dataset/test/images/'
 CHECKPOINTS_FILE_PREFIX = 'epoch'
 INFERENCE_FILE_PREFIX = 'satimage'
-ALGOPOSTPRCESSING = 'connect_roads'
+ALGOPOSTPRCESSING = 'connect_all_close_pixels'
 
 
 
@@ -256,7 +256,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                 postprocessing = PostProcessing(postprocessing_patch_size=16)
                 match ALGOPOSTPRCESSING:
                     case 'mask_connected_though_border_radius':
-                        y_hat_post_processed = postprocessing.mask_connected_though_border_radius(y_hat, downsample=2,
+                        y_hat_post_processed = postprocessing.mask_connected_though_border_radius(y_hat, downsample=1,
                                                                                                   contact_radius=3,
                                                                                                   threshold_road_not_road=0)
                     case 'connect_roads':
@@ -264,9 +264,12 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                                                                             min_group_size=1, threshold_road_not_road=0,
                                                                             fat=6)
                     case 'connect_all_close_pixels':
-                        y_hat_post_processed = postprocessing.connect_all_close_pixels(y_hat, downsample=2,
-                                                                                       distance_max=7,
+                        y_hat_post_processed = postprocessing.connect_all_close_pixels(y_hat, downsample=8,
+                                                                                       distance_max=6,
                                                                                        threshold_road_not_road=0)
+                        y_hat_post_processed = postprocessing.blurring_averaging(y_hat_post_processed, kernel_size=7)
+                    case _:
+                        y_hat_post_processed = y_hat
             else:
                 y_hat_post_processed = refinement_model(torch.sigmoid(y_hat))
 
@@ -350,7 +353,20 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
             x = x.to(DEVICE)
             pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
             postprocessing = PostProcessing(postprocessing_patch_size=16)
-            pred = postprocessing.connect_roads(pred, downsample=1, max_dist=25, min_group_size=1, threshold_road_not_road=0).cpu()
+            match ALGOPOSTPRCESSING:
+                case 'mask_connected_though_border_radius':
+                    pred = postprocessing.mask_connected_though_border_radius(pred, downsample=1,
+                                                                                              contact_radius=3,
+                                                                                              threshold_road_not_road=0).cpu()
+                case 'connect_roads':
+                    pred = postprocessing.connect_roads(pred, downsample=1, max_dist=70,
+                                                                        min_group_size=1, threshold_road_not_road=0,
+                                                                        fat=6).cpu()
+                case 'connect_all_close_pixels':
+                    pred = postprocessing.connect_all_close_pixels(pred, downsample=8,
+                                                                                   distance_max=6,
+                                                                                   threshold_road_not_road=0).cpu()
+                    y_hat_post_processed = postprocessing.blurring_averaging(y_hat_post_processed, kernel_size=7)
             if SELECTED_MODEL == 'segformer':
                 pred = torch.sigmoid(pred)
             # Add channels to end up with RGB tensors, and save the predicted masks on disk

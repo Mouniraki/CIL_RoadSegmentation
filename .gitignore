@@ -3,3 +3,5 @@ tensorboard/
 predictions/
 checkpoints/
 __pycache__/
+.idea/
+postProcessing_result/

@@ -88,8 +88,10 @@ class PostProcessing:
     Following the principle of Bresenham's line algorithm'''
     def __cordinates_between_points(self, p1, p2, fat=0):
 
-
-        fat_kernel = torch.tensor([[i, j] for i in range(-fat, fat) for j in range(-fat, fat)]).to(DEVICE)
+        if fat==0:
+            fat_kernel = torch.tensor([[0,0]]).to(DEVICE)
+        else:
+            fat_kernel = torch.tensor([[i, j] for i in range(-fat, fat) for j in range(-fat, fat)]).to(DEVICE)
 
 
 
@@ -245,9 +247,9 @@ class PostProcessing:
                 candidate_road_coordinates = road_coordinates[(road_coordinates[:, 0] <= road_coordinate[0]+distance_max) * (road_coordinates[:, 0] >= road_coordinate[0]) * (road_coordinates[:, 1] >= road_coordinate[1]) * (road_coordinates[:, 1] <= road_coordinate[1]+distance_max)] #look only down, right -> up, left connection are made from upper, left road pixels
                 for candidate_road_coordinate in candidate_road_coordinates:
                     dist = torch.norm(road_coordinate-candidate_road_coordinate)
-                    if dist <= distance_max and dist>1: #alraedy neighbooring pixel are ignored no road needed to connect them
-                        added_coordinates = self.__cordinates_between_points(road_coordinate, candidate_road_coordinate)
-                        acc_result = torch.cat([acc_result, added_coordinates], dim=0)
+                    if dist > distance_max or dist<=1: continue#alraedy neighbooring pixel are ignored no road needed to connect them
+                    added_coordinates = self.__cordinates_between_points(road_coordinate, candidate_road_coordinate)
+                    acc_result = torch.cat([acc_result, added_coordinates], dim=0)
             acc_result = torch.unique(acc_result, sorted=False, return_inverse=False, return_counts=False, dim=0)
 
             mask_connect_road = torch.zeros(mask_connect_road.shape).to(DEVICE)
