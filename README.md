@@ -34,23 +34,17 @@ File structure of principal parts:
     │     ├── randomresizedcrop.py  -> Class used to resize and crop randomly the training images (Data augmentation)
     │     └── rotation.py           -> Class used to rotate randomly the training images (Data augmentation)
     ├── losses
-    │ ├── loss.py               -> Implements the losses used in the training loop
-    ├── metrics.py              -> Implement the method used to compute the metrics : patch_accuracy_fn / precision_fn / recall_fn / f1_fn / patch_f1_fn / iou_fn 
+    │ ├── loss.py                   -> Implements the losses used in the training loop
+    ├── metrics.py                  -> Implement the method used to compute the metrics : patch_accuracy_fn / precision_fn / recall_fn / f1_fn / patch_f1_fn /                                             iou_fn 
     ├── models
-    │ ├── segformer.py          -> Define our model with the configuration adapted to the task of road segmentation
-    │ └── unet.py               -> Define a unet model, used in our initial testing based on the code furnished by the teaching team and used in the deep postprocessing model
-    ├── plotting.py             -> Define the utils method used for displaying and saving the resulting mask and images (plot_patches / show_val_samples were given by the teaching team)
+    │ ├── segformer.py              -> Define our model with the configuration adapted to the task of road segmentation
+    │ └── unet.py                   -> Define a unet model, used in our initial testing based on the code furnished by the teaching team and used in the deep postprocessing model
+    ├── plotting.py                 -> Define the utils method used for displaying and saving the resulting mask and images (plot_patches / show_val_samples were given by the teaching team)
     ├── post_processing
-    │ ├── post_processing.py    -> Implementation of the method of postprocessing as defined in the report
+    │ ├── post_processing.py        -> Implementation of the method of postprocessing as defined in the report
     └── submission
-        ├── 23-07-2024_14-51-05_with_connect_all_close_pixels_dist_3_downscale8.csv
-        ├── 23-07-2024_14-51-05_with_connect_all_close_pixels_dist_4_downscample_5.csv
-        ├── 23-07-2024_14-51-05_with_connect_road_dist_70_fat_6.csv
-        ├── 23-07-2024_14-51-05_with_mask_connected_though_border_radius_3.csv
-        ├── dummy_submission_externDataset.csv
-        ├── dummy_submission_good_score.csv
-        ├── mask_to_submission.py -> Code given by Kaggle to convert our prediction to the format accepted by the platfrom
-        └── submission_to_mask.py -> Code reverting a Kaggle submission to images
+        ├── mask_to_submission.py   -> Code given by Kaggle to convert our prediction to the format accepted by the platfrom
+        └── submission_to_mask.py   -> Code reverting a Kaggle submission to images
 ```
 
 ## Requirements
@@ -62,6 +56,7 @@ File structure of principal parts:
 ```
 dataset -> CIL_RoadSegmentation
 checkpoints -> CIL_RoadSegmentation
+finetuned3 -> utils/models
 ```
 2. Install dependencies
 
@@ -75,8 +70,12 @@ pip install -r env_setup/requirements.txt
 
 
 ## Run
-###Training
+### Training
+```
 python3 main.py --n_epochs=100 --n_augmentation=4 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer"
+```
 
-###PostProcessing / Inference
+### PostProcessing / Inference
+```
 python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer"
+```
