@@ -43,8 +43,12 @@ parser.add_argument('-d', '--debug',
 
 parser.add_argument('-m', '--model',
                     help='Set this to the desired model', default="segformer")
-args = parser.parse_args()
 
+parser.add_argument('-r', '--refinement', default=True, type=bool, help='Use the refinement model or not')
+
+parser.add_argument('-rt', '--refinement_training', default=False, type=bool, help='Use the already trained finetune model or train a new one.')
+
+args = parser.parse_args()
 
 
 LR = 0.00006
@@ -62,15 +66,11 @@ CHECKPOINTS_FILE_PREFIX = 'epoch'
 INFERENCE_FILE_PREFIX = 'satimage'
 ALGOPOSTPRCESSING = 'connect_roads'
 
-
-
 N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
 #Refinement model
-REFINEMENT_TRAINING = False
-REFINEMENT = False
-REFINEMENT_PRETRAINED_PATH = "utils/models/refinement_weights3"
-REFINEMENT_FINETUNED_PATH = "utils/models/finetuned3/finetuned3/3.pth"
+REFINEMENT_FINETUNED_PATH = "/utils/models/refinement_finetuned.pth"
+LOCAL_EVALUATION = False
 
 # Function for postprocessing experimentations based on the best model trained so far (see description.txt for more information)
 def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type: str = 'diceloss', n_models: int = 5, best_epochs: list[int] = [16, 35, 27, 19, 34]):
@@ -101,6 +101,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
         # img_size=(512, 512)
     )
 
+
     eval_loader = DataLoader(
                     dataset=images_dataset,
                     batch_size=args.batch_size,
@@ -115,11 +116,10 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
         else:
             loss_fn = torch.nn.BCEWithLogitsLoss()
 
-        if REFINEMENT or REFINEMENT_TRAINING:
+        if args.refinement or args.refinment_training:
             refinement_model = UNet(channels=(1, 64, 128, 256, 512, 1024)).to(DEVICE)
             refinement_loss = DiceLoss(model = "refinement") #so that the loss does not do sigmoid
-            if REFINEMENT_TRAINING:
-                refinement_model.load_state_dict(torch.load(REFINEMENT_PRETRAINED_PATH))
+            if args.refinement_training:
                 refinement_optimizer = torch.optim.AdamW(refinement_model.parameters(), lr=LR)
             else:
                 refinement_model.load_state_dict(torch.load(REFINEMENT_FINETUNED_PATH))
@@ -136,13 +136,15 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
     else:
         models = [model.load_pretrained(checkpoint=f"{checkpoints_folder}/{CHECKPOINTS_FILE_PREFIX}-{best_epochs[0]}.pth").to(DEVICE)]
 
-    # Setting all models to eval mode
+    # Setting all segformer models to eval mode
     for m in models:
         m.eval()
 
 
-    #Refinement model fine-tuning
-    if REFINEMENT_TRAINING:
+    #############################
+    # Training of the refinement UNet model
+    #############################
+    if args.refinement_training:
         print("Start Refinement training")
         train_dataset, val_dataset = random_split(images_dataset, [0.8, 0.2])
         train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, num_workers=N_WORKERS, shuffle=True)
@@ -238,11 +240,16 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                 elif epoch - best_epoch >= args.early_stopping_threshold:
                     print(f"Early stopped at epoch {epoch+1} with best epoch {best_epoch+1}")
                     break
+        print("Refinement training finished")
+    
+    if args.refinement:
+        refinement_model.eval()
 
     """
-    if REFINEMENT:
-        print("Refinement training finished")
-        refinement_model.eval()
+    #############################
+    # Evaluation of post processing routines
+    #############################
+    if(LOCAL_EVALUATION):
         with torch.no_grad():
             # For debugging visualization
             val_samples, ground_truths, val_predictions, val_predictions_p = [], [], [], []
@@ -332,10 +339,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
             if args.debug:
                 # For debugging purposes : display the validation samples used for validation
                 save_postProcessing_effect(torch.cat(val_predictions, dim=0), torch.cat(val_predictions_p, dim=0), torch.cat(ground_truths, dim=0), title_prefix="postProcessing_result/"+'postProcessingResult', segmentation=False)
-
 """
-
-
 
     #############################
     # Inference routine
@@ -352,14 +356,14 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
     # Create a new folder for the predicted masks
     os.makedirs(INFERENCE_FOLDER, exist_ok=True)
-    if REFINEMENT:
+    if args.refinement:
         refinement_model.eval()
     model.eval()
     with torch.no_grad():
         img_idx = 144 # Test images start at index 144
         for x, _ in test_dataloader:
             x = x.to(DEVICE)
-            if not REFINEMENT:
+            if not args.refinement:
                 pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
                 postprocessing = PostProcessing(postprocessing_patch_size=16)
                 match ALGOPOSTPRCESSING:
@@ -380,7 +384,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                 pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
                 pred = refinement_model(torch.sigmoid(pred))
             
-            if args.model == 'segformer' and not REFINEMENT:
+            if args.model == 'segformer' and not args.refinement:
                 pred = torch.sigmoid(pred)
             # Add channels to end up with RGB tensors, and save the predicted masks on disk
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
