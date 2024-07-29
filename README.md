@@ -75,8 +75,8 @@ pip install -r env_setup/requirements.txt
 
 
 ## Run
-###Training
+### Training
 python3 main.py --n_epochs=100 --n_augmentation=4 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer"
 
-###PostProcessing / Inference
+### PostProcessing / Inference
 python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer"
