@@ -33,11 +33,11 @@ CUTOFF = 0.25
 
 parser = argparse.ArgumentParser(prog='main', description='The file implement the trainig loop for our CIL project implementation')
 parser.add_argument('-ne', '--n_epochs',
-                    help='maximum number of epochs performed during training', default=100)
+                    help='maximum number of epochs performed during training', default=100, type=int)
 parser.add_argument('-s', '--early_stopping_threshold',
-                    help='Nbr of epoch given to the model to improve on previously better result', default=10)
+                    help='Nbr of epoch given to the model to improve on previously better result', default=10, type=int)
 parser.add_argument('-bs', '--batch_size',
-                    help='The nbr of sample evaluated in parallel ', default=4)
+                    help='The nbr of sample evaluated in parallel ', default=4, type=int)
 parser.add_argument('-d', '--debug',
                     help=' To enable / disable the show_val_samples routine ', default=True)
 
