@@ -52,3 +52,29 @@ File structure of principal parts:
         ├── mask_to_submission.py -> Code given by Kaggle to convert our prediction to the format accepted by the platfrom
         └── submission_to_mask.py -> Code reverting a Kaggle submission to images
 ```
+
+## Requirements
+
+* **Inference and training :** We performed the training and inference with a GPU of 8GB of memory. In case mmore memory is availible, you may consider increasing the batch_size to increase performance.
+
+## Getting Started
+1. Download the checkpoints and the dataset on polybox
+```
+dataset -> CIL_RoadSegmentation
+checkpoints -> CIL_RoadSegmentation
+```
+2. Install dependencies
+
+Create and activate a virtual environment
+```
+python3 -m venv env_cil
+source env_cil/bin/activate
+pip install -r env_setup/requirements.txt
+```
+
+
+
+## Run
+###Training
+
+###PostProcessing / Inference
