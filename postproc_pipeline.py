@@ -25,6 +25,7 @@ from utils.post_processing.post_processing import PostProcessing
 
 # To select the proper hardware accelerator
 DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+DEVICE = 'cpu'
 
 # Constants
 PATCH_SIZE = 16
@@ -57,9 +58,9 @@ N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
 #Refinement model
 REFINEMENT_TRAINING = False
-REFINEMENT = False
-PRETRAIN_REFINEMENT_PATH = "utils/models/refinement_weights2"
-REFINEMENT_PATH = ""
+REFINEMENT = True
+REFINEMENT_PRETRAINED_PATH = "utils/models/refinement_weights3"
+REFINEMENT_FINETUNED_PATH = "utils/models/finetuned3/finetuned3/3.pth"
 
 # Function for postprocessing experimentations based on the best model trained so far (see description.txt for more information)
 def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type: str = 'diceloss', n_models: int = 5, best_epochs: list[int] = [16, 35, 27, 19, 34]):
@@ -79,7 +80,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
     # Checkpoints inference routine
     #############################
     # Loading the whole training dataset for postprocessing
-    transforms = compose.Compose([rotation.Rotation(angle=30, probability=0.6)])
+    transforms = compose.Compose([rotation.Rotation(angle=30, probability=0.8)])
 
     images_dataset = ImageDataset(
         for_train=True,
@@ -105,13 +106,13 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
             loss_fn = torch.nn.BCEWithLogitsLoss()
 
         if REFINEMENT or REFINEMENT_TRAINING:
-            refinement_model = UNet(channels=(1, 64, 128, 256, 512, 1024))
+            refinement_model = UNet(channels=(1, 64, 128, 256, 512, 1024)).to(DEVICE)
+            refinement_loss = DiceLoss(model = "refinement") #so that the loss does not do sigmoid
             if REFINEMENT_TRAINING:
-                refinement_model.load_state_dict(torch.load(PRETRAIN_REFINEMENT_PATH))
-                refinement_loss = DiceLoss(model = "refinement") #so that the loss does not do sigmoid
+                refinement_model.load_state_dict(torch.load(REFINEMENT_PRETRAINED_PATH))
                 refinement_optimizer = torch.optim.AdamW(refinement_model.parameters(), lr=LR)
             else:
-                refinement_model.load_state_dict(torch.load(REFINEMENT_PATH))
+                refinement_model.load_state_dict(torch.load(REFINEMENT_FINETUNED_PATH))
     else:
         model = UNet()
         if loss_type == 'diceloss':
@@ -228,102 +229,101 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                     print(f"Early stopped at epoch {epoch+1} with best epoch {best_epoch+1}")
                     break
 
-
+    """
     if REFINEMENT:
         print("Refinement training finished")
         refinement_model.eval()
-    with torch.no_grad():
-        # For debugging visualization
-        val_samples, ground_truths, val_predictions, val_predictions_p = [], [], [], []
+        with torch.no_grad():
+            # For debugging visualization
+            val_samples, ground_truths, val_predictions, val_predictions_p = [], [], [], []
 
-        # To compute the overall patch accuracy
-        batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1, losses = [], [], [], [], [], [], []
-        batch_patch_acc_p, batch_iou_p, batch_precision_p, batch_recall_p, batch_f1_p, batch_patch_f1_p, losses_p = [], [], [], [], [], [], []
+            # To compute the overall patch accuracy
+            batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1, losses = [], [], [], [], [], [], []
+            batch_patch_acc_p, batch_iou_p, batch_precision_p, batch_recall_p, batch_f1_p, batch_patch_f1_p, losses_p = [], [], [], [], [], [], []
 
-        progress_bar = tqdm(iterable=eval_loader, desc=f"Processing the samples...")
-        for (x, y) in progress_bar:
-            x = x.to(DEVICE)
-            y = y.to(DEVICE)
-            val_samples.append(x.detach().cpu())
-            ground_truths.append(y.detach().cpu())
+            progress_bar = tqdm(iterable=eval_loader, desc=f"Processing the samples...")
+            for (x, y) in progress_bar:
+                x = x.to(DEVICE)
+                y = y.to(DEVICE)
+                val_samples.append(x.detach().cpu())
+                ground_truths.append(y.detach().cpu())
 
-            #compute model prediction
-            y_hat = torch.stack([m(x) for m in models]).mean(dim=0)
+                #compute model prediction
+                y_hat = torch.stack([m(x) for m in models]).mean(dim=0)
 
-            #pass the prediction though the postprocessing module
+                #pass the prediction though the postprocessing module
 
-            if not REFINEMENT:
-                postprocessing = PostProcessing(postprocessing_patch_size=16)
-                match ALGOPOSTPRCESSING:
-                    case 'mask_connected_though_border_radius':
-                        y_hat_post_processed = postprocessing.mask_connected_though_border_radius(y_hat, downsample=2,
-                                                                                                  contact_radius=3,
-                                                                                                  threshold_road_not_road=0)
-                    case 'connect_roads':
-                        y_hat_post_processed = postprocessing.connect_roads(y_hat, downsample=1, max_dist=70,
-                                                                            min_group_size=1, threshold_road_not_road=0,
-                                                                            fat=6)
-                    case 'connect_all_close_pixels':
-                        y_hat_post_processed = postprocessing.connect_all_close_pixels(y_hat, downsample=2,
-                                                                                       distance_max=7,
-                                                                                       threshold_road_not_road=0)
-            else:
-                y_hat_post_processed = refinement_model(torch.sigmoid(y_hat))
+                if not REFINEMENT:
+                    postprocessing = PostProcessing(postprocessing_patch_size=16)
+                    match ALGOPOSTPRCESSING:
+                        case 'mask_connected_though_border_radius':
+                            y_hat_post_processed = postprocessing.mask_connected_though_border_radius(y_hat, downsample=2,
+                                                                                                    contact_radius=3,
+                                                                                                    threshold_road_not_road=0)
+                        case 'connect_roads':
+                            y_hat_post_processed = postprocessing.connect_roads(y_hat, downsample=1, max_dist=70,
+                                                                                min_group_size=1, threshold_road_not_road=0,
+                                                                                fat=6)
+                        case 'connect_all_close_pixels':
+                            y_hat_post_processed = postprocessing.connect_all_close_pixels(y_hat, downsample=2,
+                                                                                        distance_max=7,
+                                                                                        threshold_road_not_road=0)
+                else:
+                    y_hat_post_processed = refinement_model(torch.sigmoid(y_hat))
 
-            # metrics model raw
-            
-            loss = loss_fn(y_hat, y)
-            if SELECTED_MODEL == 'segformer': y_hat = torch.sigmoid(y_hat)
-            val_predictions.append(y_hat.detach().cpu())
-            losses.append(loss.item())
-            batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat, y=y))
-            batch_iou.append(iou_fn(y_hat=y_hat, y=y))
-            batch_precision.append(precision_fn(y_hat=y_hat, y=y))
-            batch_recall.append(recall_fn(y_hat=y_hat, y=y))
-            batch_f1.append(f1_fn(y_hat=y_hat, y=y))
-            batch_patch_f1.append(patch_f1_fn(y_hat=y_hat, y=y))
+                # metrics model raw
+                loss = loss_fn(y_hat, y)
+                if SELECTED_MODEL == 'segformer': y_hat = torch.sigmoid(y_hat)
+                val_predictions.append(y_hat.detach().cpu())
+                losses.append(loss.item())
+                batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat, y=y))
+                batch_iou.append(iou_fn(y_hat=y_hat, y=y))
+                batch_precision.append(precision_fn(y_hat=y_hat, y=y))
+                batch_recall.append(recall_fn(y_hat=y_hat, y=y))
+                batch_f1.append(f1_fn(y_hat=y_hat, y=y))
+                batch_patch_f1.append(patch_f1_fn(y_hat=y_hat, y=y))
 
-            
+                
 
-            # metrics model postprocessed
-            if REFINEMENT:
-                loss_post_processed = refinement_loss(y_hat_post_processed, y)
-            else:
-                loss_post_processed = loss_fn(y_hat_post_processed, y)
-                if SELECTED_MODEL == 'segformer': y_hat_post_processed = torch.sigmoid(y_hat_post_processed)
-            
-            val_predictions_p.append(y_hat_post_processed.detach().cpu())
-            losses_p.append(loss_post_processed.item())
-            batch_patch_acc_p.append(patch_accuracy_fn(y_hat=y_hat_post_processed, y=y))
-            batch_iou_p.append(iou_fn(y_hat=y_hat_post_processed, y=y))
-            batch_precision_p.append(precision_fn(y_hat=y_hat_post_processed, y=y))
-            batch_recall_p.append(recall_fn(y_hat=y_hat_post_processed, y=y))
-            batch_f1_p.append(f1_fn(y_hat=y_hat_post_processed, y=y))
-            batch_patch_f1_p.append(patch_f1_fn(y_hat=y_hat_post_processed, y=y))
-
-
-        print("----------Model raw metrics----------")
-        print(f"Overall patch accuracy: {torch.cat(batch_patch_acc, dim=0).mean()}")
-        print(f"Mean IoU: { torch.cat(batch_iou, dim=0).mean()}")
-        print(f"Precision: {torch.cat(batch_precision, dim=0).mean()}")
-        print(f"Recall: {torch.cat(batch_recall, dim=0).mean()}")
-        print(f"F1 Score: {torch.cat(batch_f1, dim=0).mean()}")
-        print(f"Patch F1 Score: {torch.cat(batch_patch_f1, dim=0).mean()}")
-        print(f"Loss: {torch.tensor(losses).mean()}")
-        print("----------Model postprocessed metrics:----------")
-        print(f"Overall patch accuracy: {torch.cat(batch_patch_acc_p, dim=0).mean()}")
-        print(f"Mean IoU: { torch.cat(batch_iou_p, dim=0).mean()}")
-        print(f"Precision: {torch.cat(batch_precision_p, dim=0).mean()}")
-        print(f"Recall: {torch.cat(batch_recall_p, dim=0).mean()}")
-        print(f"F1 Score: {torch.cat(batch_f1_p, dim=0).mean()}")
-        print(f"Patch F1 Score: {torch.cat(batch_patch_f1_p, dim=0).mean()}")
-        print(f"Loss: {torch.tensor(losses_p).mean()}")
-
-        if DEBUG:
-            # For debugging purposes : display the validation samples used for validation
-            save_postProcessing_effect(torch.cat(val_predictions, dim=0), torch.cat(val_predictions_p, dim=0), torch.cat(ground_truths, dim=0), title_prefix="postProcessing_result/"+'postProcessingResult', segmentation=False)
+                # metrics model postprocessed
+                if REFINEMENT:
+                    loss_post_processed = refinement_loss(y_hat_post_processed, y)
+                else:
+                    loss_post_processed = loss_fn(y_hat_post_processed, y)
+                    if SELECTED_MODEL == 'segformer': y_hat_post_processed = torch.sigmoid(y_hat_post_processed)
+                
+                val_predictions_p.append(y_hat_post_processed.detach().cpu())
+                losses_p.append(loss_post_processed.item())
+                batch_patch_acc_p.append(patch_accuracy_fn(y_hat=y_hat_post_processed, y=y))
+                batch_iou_p.append(iou_fn(y_hat=y_hat_post_processed, y=y))
+                batch_precision_p.append(precision_fn(y_hat=y_hat_post_processed, y=y))
+                batch_recall_p.append(recall_fn(y_hat=y_hat_post_processed, y=y))
+                batch_f1_p.append(f1_fn(y_hat=y_hat_post_processed, y=y))
+                batch_patch_f1_p.append(patch_f1_fn(y_hat=y_hat_post_processed, y=y))
 
 
+            print("----------Model raw metrics----------")
+            print(f"Overall patch accuracy: {torch.cat(batch_patch_acc, dim=0).mean()}")
+            print(f"Mean IoU: { torch.cat(batch_iou, dim=0).mean()}")
+            print(f"Precision: {torch.cat(batch_precision, dim=0).mean()}")
+            print(f"Recall: {torch.cat(batch_recall, dim=0).mean()}")
+            print(f"F1 Score: {torch.cat(batch_f1, dim=0).mean()}")
+            print(f"Patch F1 Score: {torch.cat(batch_patch_f1, dim=0).mean()}")
+            print(f"Loss: {torch.tensor(losses).mean()}")
+            print("----------Model postprocessed metrics:----------")
+            print(f"Overall patch accuracy: {torch.cat(batch_patch_acc_p, dim=0).mean()}")
+            print(f"Mean IoU: { torch.cat(batch_iou_p, dim=0).mean()}")
+            print(f"Precision: {torch.cat(batch_precision_p, dim=0).mean()}")
+            print(f"Recall: {torch.cat(batch_recall_p, dim=0).mean()}")
+            print(f"F1 Score: {torch.cat(batch_f1_p, dim=0).mean()}")
+            print(f"Patch F1 Score: {torch.cat(batch_patch_f1_p, dim=0).mean()}")
+            print(f"Loss: {torch.tensor(losses_p).mean()}")
+
+            if DEBUG:
+                # For debugging purposes : display the validation samples used for validation
+                save_postProcessing_effect(torch.cat(val_predictions, dim=0), torch.cat(val_predictions_p, dim=0), torch.cat(ground_truths, dim=0), title_prefix="postProcessing_result/"+'postProcessingResult', segmentation=False)
+
+"""
 
 
 
@@ -342,16 +342,22 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
     # Create a new folder for the predicted masks
     os.makedirs(INFERENCE_FOLDER, exist_ok=True)
-
+    if REFINEMENT:
+        refinement_model.eval()
     model.eval()
     with torch.no_grad():
         img_idx = 144 # Test images start at index 144
         for x, _ in test_dataloader:
             x = x.to(DEVICE)
-            pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
-            postprocessing = PostProcessing(postprocessing_patch_size=16)
-            pred = postprocessing.connect_roads(pred, downsample=1, max_dist=25, min_group_size=1, threshold_road_not_road=0).cpu()
-            if SELECTED_MODEL == 'segformer':
+            if not REFINEMENT:
+                pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
+                postprocessing = PostProcessing(postprocessing_patch_size=16)
+                pred = postprocessing.connect_roads(pred, downsample=1, max_dist=25, min_group_size=1, threshold_road_not_road=0).cpu()
+            else:
+                pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
+                pred = refinement_model(torch.sigmoid(pred))
+            
+            if SELECTED_MODEL == 'segformer' and not REFINEMENT:
                 pred = torch.sigmoid(pred)
             # Add channels to end up with RGB tensors, and save the predicted masks on disk
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
@@ -361,4 +367,4 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                 img_idx += 1
 
 if __name__ == "__main__":
-    postprocessing_pipeline(folder_name="22-07-2024_16-50-49", loss_type="diceloss", n_models=1, best_epochs=[14])
+    postprocessing_pipeline(folder_name="23-07-2024_14-51-05", loss_type="diceloss", n_models=5, best_epochs=[16, 35, 27, 19, 34])
