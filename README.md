@@ -49,7 +49,7 @@ File structure of principal parts:
 
 ## Requirements
 
-* **Inference and training were performed with a GPU of 8GB of memory. In case more memory is availible, you may consider increasing the batch_size to increase performance.
+* **Inference and training were performed with a GPU of 8GB of memory. In case more memory is available, you may consider increasing the batch_size to increase performance.
 
 ## Getting Started
 1. Download the checkpoints and the dataset on polybox
