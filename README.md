@@ -34,17 +34,17 @@ File structure of principal parts:
     │     ├── randomresizedcrop.py  -> Class used to resize and crop randomly the training images (Data augmentation)
     │     └── rotation.py           -> Class used to rotate randomly the training images (Data augmentation)
     ├── losses
-    │ ├── loss.py               -> Implements the losses used in the training loop
-    ├── metrics.py              -> Implement the method used to compute the metrics : patch_accuracy_fn / precision_fn / recall_fn / f1_fn / patch_f1_fn / iou_fn 
+    │ ├── loss.py                   -> Implements the losses used in the training loop
+    ├── metrics.py                  -> Implement the method used to compute the metrics : patch_accuracy_fn / precision_fn / recall_fn / f1_fn / patch_f1_fn /                                             iou_fn 
     ├── models
-    │ ├── segformer.py          -> Define our model with the configuration adapted to the task of road segmentation
-    │ └── unet.py               -> Define a unet model, used in our initial testing based on the code furnished by the teaching team and used in the deep postprocessing model
-    ├── plotting.py             -> Define the utils method used for displaying and saving the resulting mask and images (plot_patches / show_val_samples were given by the teaching team)
+    │ ├── segformer.py              -> Define our model with the configuration adapted to the task of road segmentation
+    │ └── unet.py                   -> Define a unet model, used in our initial testing based on the code furnished by the teaching team and used in the deep postprocessing model
+    ├── plotting.py                 -> Define the utils method used for displaying and saving the resulting mask and images (plot_patches / show_val_samples were given by the teaching team)
     ├── post_processing
-    │ ├── post_processing.py    -> Implementation of the method of postprocessing as defined in the report
+    │ ├── post_processing.py        -> Implementation of the method of postprocessing as defined in the report
     └── submission
-        ├── mask_to_submission.py -> Code given by Kaggle to convert our prediction to the format accepted by the platfrom
-        └── submission_to_mask.py -> Code reverting a Kaggle submission to images
+        ├── mask_to_submission.py     -> Code given by Kaggle to convert our prediction to the format accepted by the platfrom
+        └── submission_to_mask.py     -> Code reverting a Kaggle submission to images
 ```
 
 ## Requirements
