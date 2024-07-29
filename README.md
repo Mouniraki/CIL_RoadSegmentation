@@ -43,8 +43,8 @@ File structure of principal parts:
     ├── post_processing
     │ ├── post_processing.py        -> Implementation of the method of postprocessing as defined in the report
     └── submission
-        ├── mask_to_submission.py     -> Code given by Kaggle to convert our prediction to the format accepted by the platfrom
-        └── submission_to_mask.py     -> Code reverting a Kaggle submission to images
+        ├── mask_to_submission.py   -> Code given by Kaggle to convert our prediction to the format accepted by the platfrom
+        └── submission_to_mask.py   -> Code reverting a Kaggle submission to images
 ```
 
 ## Requirements
