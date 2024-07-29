@@ -1,3 +1,4 @@
+import argparse
 import os
 from datetime import datetime # To save the predicted masks in a dated folder
 from tqdm import tqdm
@@ -26,14 +27,24 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is
 PATCH_SIZE = 16
 CUTOFF = 0.25
 
+parser = argparse.ArgumentParser(prog='main', description='The file implement the trainig loop for our CIL project implementation')
+parser.add_argument('-ne', '--n_epochs',
+                    help='maximum number of epochs performed during training', default=100)
+parser.add_argument('-na', '--n_augmentation', help='The number of pass on the dataset with different transformations perfomed at each training iteration',
+                    default=4) # Set to 1 for only 1 pass
+parser.add_argument('-s', '--early_stopping_threshold',
+                    help='Nbr of epoch given to the model to improve on previously better result', default=10)
+parser.add_argument('-bs', '--batch_size',
+                    help='The nbr of sample evaluated in parallel ', default=4)
+parser.add_argument('-d', '--debug',
+                    help=' To enable / disable the show_val_samples routine ', default=True)
+args = parser.parse_args()
+
+
 SELECTED_MODEL = "segformer" # Set this to the desired model
-DEBUG = True # To enable / disable the show_val_samples routine
 TRAIN_SPLIT = 0.8
 LR = 0.00006
-BATCH_SIZE = 4
 N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
-N_EPOCHS = 100
-EARLY_STOPPING_THRESHOLD = 10
 
 # To create folders for test predictions and model checkpoints
 CURR_DATE = datetime.now().strftime('%d-%m-%Y_%H-%M-%S')
@@ -46,7 +57,6 @@ TEST_DATASET_PATH = 'dataset/test/images/'
 CHECKPOINTS_FILE_PREFIX = 'epoch'
 INFERENCE_FILE_PREFIX = 'satimage'
 
-N_AUGMENTATION = 4 # Set to 1 for only 1 pass
 
 def main():
     print(f"Using {DEVICE} device")
@@ -90,23 +100,23 @@ def main():
     train_dataset, val_dataset = random_split(images_dataset, [TRAIN_SPLIT, 1 - TRAIN_SPLIT])
 
     # Creating a DataLoader for each of the training and validation datasets, used to load batches of images from the respective datasets
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, num_workers=N_WORKERS, shuffle=True)
-    validation_dataloader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, num_workers=N_WORKERS, shuffle=True)
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, num_workers=N_WORKERS, shuffle=True)
+    validation_dataloader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, num_workers=N_WORKERS, shuffle=True)
 
     # Early stopping mechanism
     best_epoch = 0
     best_loss = 100
 
-    for epoch in range(N_EPOCHS):
+    for epoch in range(args.n_epochs):
         # Perform training
         model.train()
         losses = [] # To record metric
         # Perform data augmentation by re-feeding n times the training dataset with random transformations each time
-        for n_a in range(N_AUGMENTATION):
+        for n_a in range(args.n_augmentation):
             # For the progress bar (and to load the images from the mini-batch)
             random_sampler = RandomSampler(train_dataloader.dataset, replacement=False, num_samples=400)
             sampler_dataloader = DataLoader(train_dataloader.dataset, sampler=random_sampler, batch_size=train_dataloader.batch_size)
-            progress_bar = tqdm(iterable=sampler_dataloader, desc=f"Epoch {epoch+1} / {N_EPOCHS} <- Augmentation : {n_a+1} / {N_AUGMENTATION}")
+            progress_bar = tqdm(iterable=sampler_dataloader, desc=f"Epoch {epoch+1} / {args.n_epochs} <- Augmentation : {n_a+1} / {args.n_augmentation}")
             for (x, y) in progress_bar: # x = images, y = labels
                 x = x.to(DEVICE)
                 y = y.to(DEVICE).mean(dim=1).unsqueeze(1)
@@ -132,7 +142,7 @@ def main():
             losses = [] # For the early stopping mechanism
             random_sampler_validation_dataloader = RandomSampler(validation_dataloader.dataset, replacement=False, num_samples=40)
             sampler_dataloader_validation_dataloader = DataLoader(validation_dataloader.dataset, sampler=random_sampler_validation_dataloader, batch_size=validation_dataloader.batch_size)
-            progress_bar_validation_dataloader = tqdm(iterable=sampler_dataloader_validation_dataloader, desc=f"Epoch {epoch+1} / {N_EPOCHS} <- Augmentation : {n_a+1} / {N_AUGMENTATION}")
+            progress_bar_validation_dataloader = tqdm(iterable=sampler_dataloader_validation_dataloader, desc=f"Epoch {epoch+1} / {args.n_epochs} <- Augmentation : {n_a+1} / {args.n_augmentation}")
             for (x, y) in progress_bar_validation_dataloader:
                 x = x.to(DEVICE)
                 y = y.to(DEVICE).mean(dim=1).unsqueeze(1)
@@ -176,7 +186,7 @@ def main():
             print(f"Loss: {mean_loss}")
 
             # Optional : display the validation samples used for validation
-            if DEBUG:
+            if args.debug:
                 show_val_samples(x.detach().cpu(), y.detach().cpu(), y_hat.detach().cpu())
 
             if mean_loss <= best_loss:
@@ -186,7 +196,7 @@ def main():
                 # if epoch >= 5:
                 model.save_pretrained(f"{CHECKPOINTS_FOLDER}/{CHECKPOINTS_FILE_PREFIX}-{best_epoch+1}.pth")
                 # torch.save(model.state_dict, f"checkpoints/{CURR_DATE}/epoch-{best_epoch+1}.pth")
-            elif epoch - best_epoch >= EARLY_STOPPING_THRESHOLD:
+            elif epoch - best_epoch >= args.early_stopping_threshold:
                 print(f"Early stopped at epoch {epoch+1} with best epoch {best_epoch+1}")
                 break
     
@@ -206,7 +216,7 @@ def main():
         # img_size = (512, 512)
     )
     # We don't shuffle to keep the original data ordering
-    test_dataloader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, num_workers=N_WORKERS, shuffle=False)
+    test_dataloader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, num_workers=N_WORKERS, shuffle=False)
 
     # Create a new folder for the predicted masks
     os.makedirs(INFERENCE_FOLDER, exist_ok=True)
