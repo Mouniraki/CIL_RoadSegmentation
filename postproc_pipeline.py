@@ -60,7 +60,7 @@ TRAIN_DATASET_PATH = 'dataset/training'
 TEST_DATASET_PATH = 'dataset/test/images/'
 CHECKPOINTS_FILE_PREFIX = 'epoch'
 INFERENCE_FILE_PREFIX = 'satimage'
-ALGOPOSTPRCESSING = 'connect_all_close_pixels'
+ALGOPOSTPRCESSING = 'connect_roads'
 
 
 
@@ -68,7 +68,7 @@ N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
 #Refinement model
 REFINEMENT_TRAINING = False
-REFINEMENT = True
+REFINEMENT = False
 REFINEMENT_PRETRAINED_PATH = "utils/models/refinement_weights3"
 REFINEMENT_FINETUNED_PATH = "utils/models/finetuned3/finetuned3/3.pth"
 
