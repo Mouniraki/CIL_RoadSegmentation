@@ -31,7 +31,7 @@ DEBUG = True # To enable / disable the show_val_samples routine
 TRAIN_SPLIT = 0.8
 LR = 0.00006
 BATCH_SIZE = 4
-N_WORKERS = 16 # Base is 4, set to 0 if it causes errors
+N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
 N_EPOCHS = 100
 EARLY_STOPPING_THRESHOLD = 10
 
