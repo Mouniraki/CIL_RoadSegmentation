@@ -115,9 +115,7 @@ def main():
         # Perform data augmentation by re-feeding n times the training dataset with random transformations each time
         for n_a in range(args.n_augmentation):
             # For the progress bar (and to load the images from the mini-batch)
-            random_sampler = RandomSampler(train_dataloader.dataset, replacement=False, num_samples=400)
-            sampler_dataloader = DataLoader(train_dataloader.dataset, sampler=random_sampler, batch_size=train_dataloader.batch_size)
-            progress_bar = tqdm(iterable=sampler_dataloader, desc=f"Epoch {epoch+1} / {args.n_epochs} <- Augmentation : {n_a+1} / {args.n_augmentation}")
+            progress_bar = tqdm(iterable=train_dataloader, desc=f"Epoch {epoch+1} / {args.n_epochs} <- Augmentation : {n_a+1} / {args.n_augmentation}")
             for (x, y) in progress_bar: # x = images, y = labels
                 x = x.to(DEVICE)
                 y = y.to(DEVICE).mean(dim=1).unsqueeze(1)
@@ -141,9 +139,7 @@ def main():
             batch_patch_acc, batch_iou, batch_precision, batch_recall, batch_f1, batch_patch_f1 = [], [], [], [], [], []
 
             losses = [] # For the early stopping mechanism
-            random_sampler_validation_dataloader = RandomSampler(validation_dataloader.dataset, replacement=False, num_samples=40)
-            sampler_dataloader_validation_dataloader = DataLoader(validation_dataloader.dataset, sampler=random_sampler_validation_dataloader, batch_size=validation_dataloader.batch_size)
-            progress_bar_validation_dataloader = tqdm(iterable=sampler_dataloader_validation_dataloader, desc=f"Epoch {epoch+1} / {args.n_epochs} <- Augmentation : {n_a+1} / {args.n_augmentation}")
+            progress_bar_validation_dataloader = tqdm(iterable=validation_dataloader, desc=f"Epoch {epoch+1} / {args.n_epochs} <- Augmentation : {n_a+1} / {args.n_augmentation}")
             for (x, y) in progress_bar_validation_dataloader:
                 x = x.to(DEVICE)
                 y = y.to(DEVICE).mean(dim=1).unsqueeze(1)

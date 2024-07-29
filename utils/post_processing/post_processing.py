@@ -17,6 +17,7 @@ class PostProcessing:
     Private method refer to connect_roads for documentation
     '''
 
+    @staticmethod
     def _connect_road(self, mask_labeled_roads, max_dist, min_group_size, fat):
         # this method get a image where each pixel has a group id from which he is part
         unique_labels = torch.unique(mask_labeled_roads, sorted=False,
@@ -71,6 +72,7 @@ class PostProcessing:
     Following the principle of Bresenham's line algorithm
     '''
 
+    @staticmethod
     def __cordinates_between_points(self, p1, p2, fat=0):
         # added principe of kernel for each newly added point we add all point around it in a window of size 'fat'
         if fat == 0:
@@ -123,6 +125,7 @@ class PostProcessing:
     @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
 
+    @staticmethod
     def connect_roads(self, mask_connect_roads, downsample=2, max_dist=25, min_group_size=1, threshold_road_not_road=0,
                       fat=2):
         assert min_group_size >= 1 and max_dist >= 1 and downsample >= 1
@@ -174,7 +177,8 @@ class PostProcessing:
     @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
 
-    def mask_connected_though_border_radius(self, mask_connect_roads, downsample=2, contact_radius=3,
+    @staticmethod
+    def mask_connected_though_border_radius(mask_connect_roads, downsample=2, contact_radius=3,
                                             threshold_road_not_road=0):
         assert contact_radius >= 1 and contact_radius % 2 == 1 and downsample >= 1
         negative_confidence, positive_confidence = mask_connect_roads.min().item(), mask_connect_roads.max().item()
@@ -207,6 +211,7 @@ class PostProcessing:
 
         return mask_connect_roads_padded
 
+    @staticmethod
     def blurring_averaging(self, mask_connect_roads, kernel_size=7):
         assert kernel_size % 2 == 1
         m = nn.AvgPool2d(kernel_size, stride=1, padding=(kernel_size - 1) // 2)
@@ -221,6 +226,7 @@ class PostProcessing:
     @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
 
+    @staticmethod
     def connect_all_close_pixels(self, mask_connect_roads, downsample=2, distance_max=10, threshold_road_not_road=0):
         assert distance_max >= 1 and downsample >= 1
         # downsample the predicted mask

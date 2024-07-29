@@ -1,7 +1,6 @@
 import os
 from os import listdir
 from os.path import isfile, join
-import re
 from PIL import Image
 
 mypath = './training/groundtruth'
