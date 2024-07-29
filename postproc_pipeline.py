@@ -40,12 +40,13 @@ parser.add_argument('-bs', '--batch_size',
                     help='The nbr of sample evaluated in parallel ', default=4)
 parser.add_argument('-d', '--debug',
                     help=' To enable / disable the show_val_samples routine ', default=True)
+
+parser.add_argument('-m', '--model',
+                    help='Set this to the desired model', default="segformer")
 args = parser.parse_args()
 
 
 
-SELECTED_MODEL = "segformer" # Set this to the desired model
-K_FOLDS = 5
 LR = 0.00006
 N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
 
@@ -107,10 +108,10 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
     )
 
     # Doing model selection
-    if SELECTED_MODEL == 'segformer':
+    if args.model == 'segformer':
         model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5')
         if loss_type == 'diceloss':
-            loss_fn = DiceLoss(model = SELECTED_MODEL)
+            loss_fn = DiceLoss(model = args.model)
         else:
             loss_fn = torch.nn.BCEWithLogitsLoss()
 
@@ -125,7 +126,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
     else:
         model = UNet()
         if loss_type == 'diceloss':
-            loss_fn = DiceLoss(model = SELECTED_MODEL)
+            loss_fn = DiceLoss(model = args.model)
         else:
             loss_fn = torch.nn.BCELoss()
 
@@ -282,7 +283,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
                 # metrics model raw
                 loss = loss_fn(y_hat, y)
-                if SELECTED_MODEL == 'segformer': y_hat = torch.sigmoid(y_hat)
+                if args.model == 'segformer': y_hat = torch.sigmoid(y_hat)
                 val_predictions.append(y_hat.detach().cpu())
                 losses.append(loss.item())
                 batch_patch_acc.append(patch_accuracy_fn(y_hat=y_hat, y=y))
@@ -299,7 +300,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                     loss_post_processed = refinement_loss(y_hat_post_processed, y)
                 else:
                     loss_post_processed = loss_fn(y_hat_post_processed, y)
-                    if SELECTED_MODEL == 'segformer': y_hat_post_processed = torch.sigmoid(y_hat_post_processed)
+                    if args.model == 'segformer': y_hat_post_processed = torch.sigmoid(y_hat_post_processed)
                 
                 val_predictions_p.append(y_hat_post_processed.detach().cpu())
                 losses_p.append(loss_post_processed.item())
@@ -379,7 +380,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                 pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
                 pred = refinement_model(torch.sigmoid(pred))
             
-            if SELECTED_MODEL == 'segformer' and not REFINEMENT:
+            if args.model == 'segformer' and not REFINEMENT:
                 pred = torch.sigmoid(pred)
             # Add channels to end up with RGB tensors, and save the predicted masks on disk
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
