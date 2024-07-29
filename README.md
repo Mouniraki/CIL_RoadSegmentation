@@ -43,12 +43,6 @@ File structure of principal parts:
     ├── post_processing
     │ ├── post_processing.py    -> Implementation of the method of postprocessing as defined in the report
     └── submission
-        ├── 23-07-2024_14-51-05_with_connect_all_close_pixels_dist_3_downscale8.csv
-        ├── 23-07-2024_14-51-05_with_connect_all_close_pixels_dist_4_downscample_5.csv
-        ├── 23-07-2024_14-51-05_with_connect_road_dist_70_fat_6.csv
-        ├── 23-07-2024_14-51-05_with_mask_connected_though_border_radius_3.csv
-        ├── dummy_submission_externDataset.csv
-        ├── dummy_submission_good_score.csv
         ├── mask_to_submission.py -> Code given by Kaggle to convert our prediction to the format accepted by the platfrom
         └── submission_to_mask.py -> Code reverting a Kaggle submission to images
 ```
