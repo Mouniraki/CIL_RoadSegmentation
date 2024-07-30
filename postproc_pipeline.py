@@ -353,30 +353,29 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
         img_idx = 144 # Test images start at index 144
         for x, _ in test_dataloader:
             x = x.to(DEVICE)
-            if not args.postProcessingAlgo=='deepRefinement':
-                pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
-                match args.postProcessingAlgo:
-                    case 'deepRefinement':
-                        pred = refinement_model(torch.sigmoid(pred))
-                    case 'mask_connected_though_border_radius':
-                        postprocessing = PostProcessing(postprocessing_patch_size=16)
-                        pred = postprocessing.mask_connected_though_border_radius(pred, downsample=1,
-                                                                                                contact_radius=3,
-                                                                                                threshold_road_not_road=0).cpu()
-                        pred = torch.sigmoid(pred)
-                    case 'connect_roads':
-                        postprocessing = PostProcessing(postprocessing_patch_size=16)
-                        pred = postprocessing.connect_roads(pred, downsample=1, max_dist=70,
-                                                                            min_group_size=1, threshold_road_not_road=0,
-                                                                            fat=6).cpu()
-                        pred = torch.sigmoid(pred)
-                    case 'connect_all_close_pixels':
-                        postprocessing = PostProcessing(postprocessing_patch_size=16)
-                        pred = postprocessing.connect_all_close_pixels(pred, downsample=8,
-                                                                                    distance_max=6,
-                                                                                    threshold_road_not_road=0)
-                        pred = postprocessing.blurring_averaging(pred, kernel_size=7).cpu()
-                        pred = torch.sigmoid(pred)
+            pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
+            match args.postProcessingAlgo:
+                case 'deepRefinement':
+                    pred = refinement_model(torch.sigmoid(pred))
+                case 'mask_connected_though_border_radius':
+                    postprocessing = PostProcessing(postprocessing_patch_size=16)
+                    pred = postprocessing.mask_connected_though_border_radius(pred, downsample=1,
+                                                                                            contact_radius=3,
+                                                                                            threshold_road_not_road=0).cpu()
+                    pred = torch.sigmoid(pred)
+                case 'connect_roads':
+                    postprocessing = PostProcessing(postprocessing_patch_size=16)
+                    pred = postprocessing.connect_roads(pred, downsample=1, max_dist=70,
+                                                                        min_group_size=1, threshold_road_not_road=0,
+                                                                        fat=6).cpu()
+                    pred = torch.sigmoid(pred)
+                case 'connect_all_close_pixels':
+                    postprocessing = PostProcessing(postprocessing_patch_size=16)
+                    pred = postprocessing.connect_all_close_pixels(pred, downsample=8,
+                                                                                distance_max=6,
+                                                                                threshold_road_not_road=0)
+                    pred = postprocessing.blurring_averaging(pred, kernel_size=7).cpu()
+                    pred = torch.sigmoid(pred)
 
             # Add channels to end up with RGB tensors, and save the predicted masks on disk
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
