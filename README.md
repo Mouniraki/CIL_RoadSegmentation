@@ -54,6 +54,7 @@ File structure of principal parts:
 ## Getting Started
 1. Clone the repository
 ```
+git clone git@github.com:Mouniraki/CIL_RoadSegmentation.git
 ```
 1. Download the checkpoints and the dataset on polybox : https://polybox.ethz.ch/index.php/s/hTaLVmXLUGQfmw8
 ```
