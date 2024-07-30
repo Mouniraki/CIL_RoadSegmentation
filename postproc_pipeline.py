@@ -353,7 +353,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
         img_idx = 144 # Test images start at index 144
         for x, _ in test_dataloader:
             x = x.to(DEVICE)
-            pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
+            pred = torch.stack([m(x) for m in models]).mean(dim=0).detach().cpu()
             match args.postProcessingAlgo:
                 case 'deepRefinement':
                     pred = refinement_model(torch.sigmoid(pred))
