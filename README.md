@@ -90,5 +90,5 @@ python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batc
 ### PostProcessing / Inference without pretrained weights (this will train a Unet from scratch with inference data from SegFormer to do automatic post-processing)
 Note that this is quite GPU heavy and was run on google colab with at least a 24GB GPU
 ```
-python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer" --refinement=True --refinement_training=True
+python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=2 --debug=True --model="segformer" --refinement=True --refinement_training=True
 ```
