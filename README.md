@@ -80,7 +80,7 @@ pip install -r utils/env_setup/requirements.txt
 python3 main.py --n_epochs=100 --n_augmentation=4 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer"
 ```
 
-This will give you a set of checkpoints weights that can be reused to perform post-processing if wanted.
+This will give you a set of checkpoints weights that can be reused to perform post-processing if wanted. To further perform finetuing, you have to first select which checkpoint folder created by the SegFormer training you want to use for postprocessing and change it in the main call of the processing pipeline along with the selected epochs.
 
 ### PostProcessing / Inference with pretrained weights (downloadable from the polybox under refinement_pretrained.pth)
 ```
