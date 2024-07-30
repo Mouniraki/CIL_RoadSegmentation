@@ -28,18 +28,12 @@ PATCH_SIZE = 16
 CUTOFF = 0.25
 
 parser = argparse.ArgumentParser(prog='main', description='The file implement the trainig loop for our CIL project implementation')
-parser.add_argument('-ne', '--n_epochs',
-                    help='maximum number of epochs performed during training', default=100, type=int)
-parser.add_argument('-na', '--n_augmentation', help='The number of pass on the dataset with different transformations perfomed at each training iteration',
-                    default=4, type=int) # Set to 1 for only 1 pass
-parser.add_argument('-s', '--early_stopping_threshold',
-                    help='Nbr of epoch given to the model to improve on previously better result', default=10, type=int)
-parser.add_argument('-bs', '--batch_size',
-                    help='The nbr of sample evaluated in parallel ', default=4, type=int)
-parser.add_argument('-d', '--debug',
-                    help=' To enable / disable the show_val_samples routine ', default=True)
-parser.add_argument('-m', '--model',
-                    help='Set this to the desired model', default="segformer")
+parser.add_argument('-ne', '--n_epochs', help='maximum number of epochs performed during training', default=100, type=int)
+parser.add_argument('-na', '--n_augmentation', help='The number of pass on the dataset with different transformations perfomed at each training iteration', default=4, type=int) # Set to 1 for only 1 pass
+parser.add_argument('-s', '--early_stopping_threshold', help='Nbr of epoch given to the model to improve on previously better result', default=10, type=int)
+parser.add_argument('-bs', '--batch_size', help='The nbr of sample evaluated in parallel ', default=4, type=int)
+parser.add_argument('-d', '--debug', help=' To enable / disable the show_val_samples routine ', default=True)
+parser.add_argument('-m', '--model', help='Set this to the desired model', default="segformer")
 args = parser.parse_args()
 
 
@@ -114,7 +108,7 @@ def main():
         losses = [] # To record metric
         # Perform data augmentation by re-feeding n times the training dataset with random transformations each time
         for n_a in range(args.n_augmentation):
-            #random_sampler = RandomSampler(train_dataloader.dataset, replacement=False, num_samples=400) # can be used to reduce load while using big dataset for testing
+            #random_sampler = RandomSampler(train_dataloader.dataset, replacement=False, num_samples=400) # can be used to reduce load while using a big dataset for testing
             #sampler_dataloader = DataLoader(train_dataloader.dataset, sampler=random_sampler, batch_size=train_dataloader.batch_size)
             # For the progress bar (and to load the images from the mini-batch)
             progress_bar = tqdm(iterable=train_dataloader, desc=f"Epoch {epoch+1} / {args.n_epochs} <- Augmentation : {n_a+1} / {args.n_augmentation}")

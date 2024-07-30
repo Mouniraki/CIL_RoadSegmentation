@@ -9,12 +9,10 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, SubsetRandomSampler, random_split
 from torchvision.io import write_png
 
-# For k-fold cross-validation
-from sklearn.model_selection import KFold
 
 # Importing the dataset & models
 from utils.loaders.image_dataset import ImageDataset
-from utils.loaders.transforms import compose, rotation, colorjitter, randomerasing, randomresizedcrop
+from utils.loaders.transforms import compose, rotation
 from utils.models.unet import UNet
 from utils.models.segformer import SegFormer
 from utils.losses.loss import DiceLoss
@@ -32,24 +30,19 @@ PATCH_SIZE = 16
 CUTOFF = 0.25
 
 parser = argparse.ArgumentParser(prog='main', description='The file implement the trainig loop for our CIL project implementation')
-parser.add_argument('-ne', '--n_epochs',
-                    help='maximum number of epochs performed during training', default=100, type=int)
-parser.add_argument('-s', '--early_stopping_threshold',
-                    help='Nbr of epoch given to the model to improve on previously better result', default=10, type=int)
-parser.add_argument('-bs', '--batch_size',
-                    help='The nbr of sample evaluated in parallel ', default=4, type=int)
-parser.add_argument('-d', '--debug',
-                    help=' To enable / disable the show_val_samples routine ', default=True)
-
-parser.add_argument('-m', '--model',
-                    help='Set this to the desired model', default="segformer")
-
-parser.add_argument('-r', '--refinement', default=True, type=bool, help='Use the refinement model or not')
-
+parser.add_argument('-ne', '--n_epochs', help='maximum number of epochs performed during training', default=100, type=int)
+parser.add_argument('-s', '--early_stopping_threshold', help='Nbr of epoch given to the model to improve on previously better result', default=10, type=int)
+parser.add_argument('-bs', '--batch_size', help='The nbr of sample evaluated in parallel ', default=4, type=int)
+parser.add_argument('-d', '--debug', help=' To enable / disable the show_val_samples routine ', default=True)
+parser.add_argument('-m', '--model', help='Set this to the desired model', default="segformer")
+parser.add_argument('-pa', '--postProcessingAlgo', default='connect_roads', type=str, help='precise which postprocessing algorithm the user want to use (mask_connected_though_border_radius / connect_roads / connect_all_close_pixels')
+parser.add_argument('-r', '--refinement', default=True, type=bool, help='Use the refinement model or not override the postProcessingAlgo parameter')
 parser.add_argument('-rt', '--refinement_training', default=False, type=bool, help='Use the already trained finetune model or train a new one.')
-
 args = parser.parse_args()
 
+
+if args.refinement:
+    args.postProcessingAlgo = 'deepRefinement'
 
 LR = 0.00006
 N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
@@ -64,7 +57,6 @@ TRAIN_DATASET_PATH = 'dataset/training'
 TEST_DATASET_PATH = 'dataset/test/images/'
 CHECKPOINTS_FILE_PREFIX = 'epoch'
 INFERENCE_FILE_PREFIX = 'satimage'
-ALGOPOSTPRCESSING = 'connect_roads'
 
 N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
@@ -101,13 +93,6 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
         # img_size=(512, 512)
     )
 
-
-    eval_loader = DataLoader(
-                    dataset=images_dataset,
-                    batch_size=args.batch_size,
-                    num_workers=N_WORKERS,
-    )
-
     # Doing model selection
     if args.model == 'segformer':
         model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5')
@@ -116,7 +101,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
         else:
             loss_fn = torch.nn.BCEWithLogitsLoss()
 
-        if args.refinement or args.refinment_training:
+        if args.postProcessingAlgo=='deepRefinement' or args.refinment_training:
             refinement_model = UNet(channels=(1, 64, 128, 256, 512, 1024)).to(DEVICE)
             refinement_loss = DiceLoss(model = "refinement") #so that the loss does not do sigmoid
             if args.refinement_training:
@@ -242,14 +227,19 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
                     break
         print("Refinement training finished")
     
-    if args.refinement:
+    if args.postProcessingAlgo=='deepRefinement':
         refinement_model.eval()
 
-    """
+    """ #  This code can be left uncommented if the user wants to see some validation results of the post-processing performed locally (warning : no guarantee of  truly representative resulty, the data used may have been used during training).
     #############################
     # Evaluation of post processing routines
     #############################
     if(LOCAL_EVALUATION):
+        eval_loader = DataLoader(
+                        dataset=images_dataset,
+                        batch_size=args.batch_size,
+                        num_workers=N_WORKERS,
+        )
         with torch.no_grad():
             # For debugging visualization
             val_samples, ground_truths, val_predictions, val_predictions_p = [], [], [], []
@@ -272,7 +262,7 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
                 if not REFINEMENT:
                     postprocessing = PostProcessing(postprocessing_patch_size=16)
-                    match ALGOPOSTPRCESSING:
+                    match args.postProcessingAlgo:
                         case 'mask_connected_though_border_radius':
                             y_hat_post_processed = postprocessing.mask_connected_though_border_radius(y_hat, downsample=2,
                                                                                                     contact_radius=3,
@@ -356,36 +346,38 @@ def postprocessing_pipeline(folder_name: str = '23-07-2024_14-51-05', loss_type:
 
     # Create a new folder for the predicted masks
     os.makedirs(INFERENCE_FOLDER, exist_ok=True)
-    if args.refinement:
+    if args.postProcessingAlgo=='deepRefinement':
         refinement_model.eval()
     model.eval()
     with torch.no_grad():
         img_idx = 144 # Test images start at index 144
         for x, _ in test_dataloader:
             x = x.to(DEVICE)
-            if not args.refinement:
+            if not args.postProcessingAlgo=='deepRefinement':
                 pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
-                postprocessing = PostProcessing(postprocessing_patch_size=16)
-                match ALGOPOSTPRCESSING:
+                match args.postProcessingAlgo:
+                    case 'deepRefinement':
+                        pred = refinement_model(torch.sigmoid(pred))
                     case 'mask_connected_though_border_radius':
+                        postprocessing = PostProcessing(postprocessing_patch_size=16)
                         pred = postprocessing.mask_connected_though_border_radius(pred, downsample=1,
                                                                                                 contact_radius=3,
                                                                                                 threshold_road_not_road=0).cpu()
+                        pred = torch.sigmoid(pred)
                     case 'connect_roads':
+                        postprocessing = PostProcessing(postprocessing_patch_size=16)
                         pred = postprocessing.connect_roads(pred, downsample=1, max_dist=70,
                                                                             min_group_size=1, threshold_road_not_road=0,
                                                                             fat=6).cpu()
+                        pred = torch.sigmoid(pred)
                     case 'connect_all_close_pixels':
+                        postprocessing = PostProcessing(postprocessing_patch_size=16)
                         pred = postprocessing.connect_all_close_pixels(pred, downsample=8,
                                                                                     distance_max=6,
-                                                                                    threshold_road_not_road=0).cpu()
-                        y_hat_post_processed = postprocessing.blurring_averaging(y_hat_post_processed, kernel_size=7)
-            else:
-                pred = torch.stack([m(x) for m in models]).mean(dim=0).detach()
-                pred = refinement_model(torch.sigmoid(pred))
-            
-            if args.model == 'segformer' and not args.refinement:
-                pred = torch.sigmoid(pred)
+                                                                                    threshold_road_not_road=0)
+                        pred = postprocessing.blurring_averaging(pred, kernel_size=7).cpu()
+                        pred = torch.sigmoid(pred)
+
             # Add channels to end up with RGB tensors, and save the predicted masks on disk
             pred = torch.cat([pred.moveaxis(1, -1)]*3, -1).moveaxis(-1, 1) # Here the dimension 0 is for the number of images, since we feed a batch!
             for t in pred:
