@@ -52,6 +52,9 @@ File structure of principal parts:
 * **Inference and training were performed with a GPU of 8GB of memory. In case more memory is available, you may consider increasing the batch_size to increase performance.
 
 ## Getting Started
+1. Clone the repository
+```
+```
 1. Download the checkpoints and the dataset on polybox : https://polybox.ethz.ch/index.php/s/hTaLVmXLUGQfmw8
 ```
 dataset -> CIL_RoadSegmentation
