@@ -1,6 +1,6 @@
 # ETHZ CIL Road Segmentation 2024 (Team : Highway Hackers)
 
-[CIL Road Segmentation 2024 : report Mounir Raki, Théo Ducrey, Marchon Xavier ](report.pdf)
+[CIL Road Segmentation 2024 : report Mounir Raki, Théo Ducrey, Marchon Xavier ](CIL_Report.pdf)
 
 **Initial Code Release:** This directory currently provides our implementation of our model segformer and optimization as described in our report for the project of road Segmentation. This work was done in the context of the course Computational Intelligence Lab at ETH Zürich.
 
