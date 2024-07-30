@@ -52,11 +52,16 @@ File structure of principal parts:
 * **Inference and training were performed with a GPU of 8GB of memory. In case more memory is available, you may consider increasing the batch_size to increase performance.
 
 ## Getting Started
+1. Clone the repository
+```
+git clone git@github.com:Mouniraki/CIL_RoadSegmentation.git
+cd CIL_RoadSegmentation/
+```
 1. Download the checkpoints and the dataset on polybox : https://polybox.ethz.ch/index.php/s/hTaLVmXLUGQfmw8
 ```
 dataset -> CIL_RoadSegmentation
 checkpoints -> CIL_RoadSegmentation
-finetuned3 -> utils/models
+refinement_finetuned.pth -> utils/models
 ```
 2. Install dependencies
 
@@ -64,18 +69,25 @@ Create and activate a virtual environment
 ```
 python3 -m venv env_cil
 source env_cil/bin/activate
-pip install -r env_setup/requirements.txt
+pip install -r utils/env_setup/requirements.txt
 ```
 
 
 
 ## Run
-### Training
+### Training of the SegFormer model
 ```
 python3 main.py --n_epochs=100 --n_augmentation=4 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer"
 ```
 
-### PostProcessing / Inference
+This will give you a set of checkpoints weights that can be reused to perform post-processing if wanted.
+
+### PostProcessing / Inference with pretrained weights (downloadable from the polybox under refinement_pretrained.pth)
 ```
-python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer"
+python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer" --refinement=True --postProcessingAlgo="deepRefinement"
+```
+
+### PostProcessing / Inference without pretrained weights (this will train a Unet from scratch to do automatic post-processing)
+```
+python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer" --refinement=True --refinement_training=True
 ```

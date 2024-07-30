@@ -35,9 +35,9 @@ parser.add_argument('-s', '--early_stopping_threshold', help='Nbr of epoch given
 parser.add_argument('-bs', '--batch_size', help='The nbr of sample evaluated in parallel ', default=4, type=int)
 parser.add_argument('-d', '--debug', help=' To enable / disable the show_val_samples routine ', default=True)
 parser.add_argument('-m', '--model', help='Set this to the desired model', default="segformer")
-parser.add_argument('-pa', '--postProcessingAlgo', default='connect_roads', type=str, help='precise which postprocessing algorithm the user want to use (mask_connected_though_border_radius / connect_roads / connect_all_close_pixels')
+parser.add_argument('-pa', '--postProcessingAlgo', default='connect_roads', type=str, help='precise which postprocessing algorithm the user want to use (mask_connected_though_border_radius / connect_roads / connect_all_close_pixels / deepRefinement')
 parser.add_argument('-r', '--refinement', default=True, type=bool, help='Use the refinement model or not override the postProcessingAlgo parameter')
-parser.add_argument('-rt', '--refinement_training', default=False, type=bool, help='Use the already trained finetune model or train a new one.')
+parser.add_argument('-rt', '--refinement_training', default=False, type=bool, help='Use the already trained finetune when False model or train a new one when True.')
 args = parser.parse_args()
 
 
@@ -61,7 +61,7 @@ INFERENCE_FILE_PREFIX = 'satimage'
 N_AUGMENTATION = 5 # Set to 1 for only 1 pass
 
 #Refinement model
-REFINEMENT_FINETUNED_PATH = "/utils/models/refinement_finetuned.pth"
+REFINEMENT_FINETUNED_PATH = "utils/models/refinement_finetuned.pth"
 LOCAL_EVALUATION = False
 
 # Function for postprocessing experimentations based on the best model trained so far (see description.txt for more information)
