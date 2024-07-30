@@ -61,7 +61,7 @@ cd CIL_RoadSegmentation/
 ```
 dataset -> CIL_RoadSegmentation
 checkpoints -> CIL_RoadSegmentation
-finetuned3 -> utils/models
+refinement_finetuned.pth -> utils/models
 ```
 2. Install dependencies
 
