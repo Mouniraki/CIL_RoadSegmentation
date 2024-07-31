@@ -25,6 +25,6 @@ cd /home/$USERNAME/CIL_RoadSegmentation
 
 #### put python commands here
 
-python main.py
+python main.py --n_folds=5 --use_lr_scheduler --loss=diceloss --batch_size=4 --n_epochs=100 --use_transforms --n_augmentation=10 --early_stopping_threshold=10
 
 echo "finished"
