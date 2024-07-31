@@ -29,10 +29,14 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is
 PATCH_SIZE = 16
 CUTOFF = 0.25
 
-SELECTED_MODEL = "segformer" # Set this to the desired model
 DEBUG = False # To enable / disable the show_val_samples routine
+SELECTED_MODEL = "segformer" # Set this to the desired model
+LOSS_FN = "diceloss"
+N_AUGMENTATION = 10 # Set to 1 for only 1 pass
 K_FOLDS = 5
+USE_TRANSFORMS = True
 LR = 0.00006
+VARIABLE_LR = True # To enable / disable the Polynomial LR Scheduler
 BATCH_SIZE = 4
 N_WORKERS = 4 # Base is 4, set to 0 if it causes errors
 N_EPOCHS = 100
@@ -49,8 +53,6 @@ TEST_DATASET_PATH = 'dataset/test/images/'
 CHECKPOINTS_FILE_PREFIX = 'epoch'
 INFERENCE_FILE_PREFIX = 'satimage'
 
-N_AUGMENTATION = 5 # Set to 1 for only 1 pass
-
 def main():
     print(f"Using {DEVICE} device")
 
@@ -59,9 +61,14 @@ def main():
     #############################
     print("Starting training")
     # Selecting the transformations to perform for data augmentation
-    transforms = compose.Compose([rotation.Rotation(angle=30, probability=0.6),
-                                    colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-                                    randomerasing.RandomErasing(probability=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3))])
+    if USE_TRANSFORMS:
+        transforms = compose.Compose([
+            rotation.Rotation(angle=30, probability=0.6),
+            colorjitter.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+            randomerasing.RandomErasing(probability=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3))
+        ])
+    else:
+        transforms = None
 
     # Instantiating the k-fold splits
     kfold = KFold(n_splits=K_FOLDS, shuffle=True)
@@ -78,7 +85,7 @@ def main():
 
     best_epochs = []
     for fold, (train_idx, val_idx) in enumerate(kfold.split(images_dataset)):
-        print(f"Fold {fold+1}")
+        print(f"Fold {fold+1}/{K_FOLDS}")
 
         # Create a directory for model checkpoints
         os.makedirs(f"{CHECKPOINTS_FOLDER}/fold_{fold+1}", exist_ok=True)
@@ -89,12 +96,19 @@ def main():
         # Setting up the model, loss function and optimizer
         if SELECTED_MODEL == 'segformer':
             model = SegFormer(non_void_labels=['road'], checkpoint='nvidia/mit-b5').to(DEVICE)
-            # loss_fn = torch.nn.BCEWithLogitsLoss()
-            loss_fn = DiceLoss(model=SELECTED_MODEL)
+            if LOSS_FN == "diceloss":
+                loss_fn = DiceLoss(model=SELECTED_MODEL)
+            else:
+                loss_fn = torch.nn.BCEWithLogitsLoss()
         else:
             model = UNet().to(DEVICE)
-            loss_fn = torch.nn.BCELoss()
+            if LOSS_FN == "diceloss":
+                loss_fn = DiceLoss(model=SELECTED_MODEL)
+            else:
+                loss_fn = torch.nn.BCELoss()
         optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
+        if VARIABLE_LR:
+            scheduler = torch.optim.lr_scheduler.PolynomialLR(optimizer=optimizer, total_iters=N_AUGMENTATION*100, power=0.9)
 
         train_dataloader = DataLoader(
             dataset=images_dataset,
@@ -115,13 +129,14 @@ def main():
         best_loss = 100
 
         for epoch in range(N_EPOCHS):
-            # For the progress bar (and to load the images from the mini-batch)
-            progress_bar = tqdm(iterable=train_dataloader, desc=f"Epoch {epoch+1} / {N_EPOCHS}")
             # Perform training
             model.train()
             losses = [] # To record metric
 
-            for _ in range(N_AUGMENTATION): # For the data augmentation pipeline
+            print(f"Epoch {epoch+1} / {N_EPOCHS}")
+            for pass_nb in range(N_AUGMENTATION): # For the data augmentation pipeline
+                # For the progress bar (and to load the images from the mini-batch)
+                progress_bar = tqdm(iterable=train_dataloader, desc=f"Pass {pass_nb+1} / {N_AUGMENTATION}")
                 for (x, y) in progress_bar: # x = images, y = labels
                     x = x.to(DEVICE)
                     y = y.to(DEVICE)
@@ -134,6 +149,9 @@ def main():
                         y_hat = torch.sigmoid(y_hat)
                     loss.backward() # Backward pass
                     optimizer.step()
+                if VARIABLE_LR:
+                    print(f"Current LR: {scheduler.get_last_lr()}")
+                    scheduler.step()
             
             mean_loss = torch.tensor(losses).mean()
             writer.add_scalar("Loss/train", mean_loss, epoch)

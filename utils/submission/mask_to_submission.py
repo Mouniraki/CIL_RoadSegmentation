@@ -29,7 +29,7 @@ def patch_to_label(patch):
 
 def mask_to_submission_strings(image_filename, mask_dir=None):
     """Reads a single image and outputs the strings that should go into the submission file"""
-    img_number = int(re.search(r"\d+", image_filename).group(0))
+    img_number = int(re.search(r"\d+", image_filename.split('/')[-1]).group(0))
     im = PIL.Image.open(image_filename)
     im_arr = np.asarray(im)
     if len(im_arr.shape) > 2:
