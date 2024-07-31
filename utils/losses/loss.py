@@ -1,12 +1,6 @@
 import torch
 from torch import nn
 
-
-DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
-
-
-
-
 def dice_loss(model: str, output: torch.Tensor, target: torch.Tensor):
     if model == 'segformer':
         output = torch.sigmoid(output)
@@ -37,14 +31,14 @@ def weighted_dice_loss(model: str, output: torch.Tensor, target: torch.Tensor, f
 
 
 
-def border_dice_loss(model: str, output: torch.Tensor, target: torch.Tensor):
+def border_dice_loss(model: str, output: torch.Tensor, target: torch.Tensor, device: str):
     if model == 'segformer':
         output = torch.sigmoid(output)
 
-    sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]], device=DEVICE).unsqueeze(0).unsqueeze(
-        0).to(DEVICE)
-    sobel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]], device=DEVICE).unsqueeze(0).unsqueeze(
-        0).to(DEVICE)
+    sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]], device=device).unsqueeze(0).unsqueeze(
+        0).to(device)
+    sobel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]], device=device).unsqueeze(0).unsqueeze(
+        0).to(device)
 
     edge_x = torch.nn.functional.conv2d(output, sobel_x, padding=0)
     edge_y = torch.nn.functional.conv2d(output, sobel_y, padding=0)
@@ -93,18 +87,19 @@ class BorderDiceLoss(nn.Module):
         self.device = device
 
     def forward(self, output: torch.Tensor, target: torch.Tensor):
-        return border_dice_loss(self.model, output, target)
+        return border_dice_loss(self.model, output, target, self.device)
 
 
 
 class CombineLoss(nn.Module):
-    def __init__(self, model: str):
+    def __init__(self, model: str, device: str):
         super(CombineLoss, self).__init__()
         self.model = model
+        self.device = device
 
     def forward(self, output: torch.Tensor, target: torch.Tensor):
 
         diceLoss = dice_loss(self.model, output, target)
-        borderDiceLoss = border_dice_loss(self.model, output, target)
+        borderDiceLoss = border_dice_loss(self.model, output, target, self.device)
 
-        return diceLoss/2+borderDiceLoss/2 # by summing we increase border influence on loss
+        return diceLoss/2 + borderDiceLoss/2 # by summing we increase border influence on loss
