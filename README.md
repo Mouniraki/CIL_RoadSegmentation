@@ -82,9 +82,14 @@ python3 main.py --n_epochs=100 --n_augmentation=4 --early_stopping_threshold=10 
 
 This will give you a set of checkpoints weights that can be reused to perform post-processing if wanted. To further perform post-processing, you have to first select which checkpoint folder created by the SegFormer training you want to use for postprocessing and change it in the main call of the processing pipeline along with the selected epochs.
 
-### PostProcessing / Inference with pretrained weights (downloadable from the polybox under refinement_pretrained.pth)
+### PostProcessing / Inference with pretrained weights (downloadable above from the polybox under refinement_pretrained.pth)
 ```
 python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer" --refinement=True --postProcessingAlgo="deepRefinement"
+```
+
+### PostProcessing / Inference with manual method 
+```
+python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer" --refinement=False --postProcessingAlgo="connect_roads"
 ```
 
 ### PostProcessing / Inference without pretrained weights (this will train a Unet from scratch with inference data from SegFormer to do automatic post-processing)
