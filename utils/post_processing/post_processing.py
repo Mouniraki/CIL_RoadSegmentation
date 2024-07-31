@@ -19,7 +19,6 @@ class PostProcessing:
                       max_dist, 
                       min_group_size, 
                       fat):
-        print(mask_labeled_roads)
         # this method get a image where each pixel has a group id from which he is part
         unique_labels = torch.unique(mask_labeled_roads, sorted=False,
                                      return_inverse=False)  # we get the list of group's labels
