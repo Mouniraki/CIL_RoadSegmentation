@@ -25,10 +25,6 @@ cd /home/$USERNAME/CIL_RoadSegmentation
 
 #### put python commands here
 
-<<<<<<< HEAD
 python3 postproc_pipeline.py --postprocessing_type=deepnet --batch_size=4
-=======
-python main.py --n_folds=5 --use_lr_scheduler --loss=diceloss --batch_size=4 --n_epochs=100 --use_transforms --n_augmentation=10 --early_stopping_threshold=10
->>>>>>> 21a8649d21ec80493e2d922e7095ef1c1a5163cd
 
 echo "finished"
