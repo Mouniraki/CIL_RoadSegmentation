@@ -81,18 +81,18 @@ python3 main.py --n_folds=5 --use_lr_scheduler --loss=diceloss --batch_size=4 --
 
 This will give you a set of checkpoints weights that can be reused to perform post-processing if wanted. To further perform post-processing, you have to first select which checkpoint folder created by the SegFormer training you want to use for postprocessing and change it in the main call of the processing pipeline along with the selected epochs.
 
-### PostProcessing / Inference with pretrained weights (downloadable above from the polybox under refinement_pretrained.pth)
+### PostProcessing / Inference with pretrained weights (downloadable above from the polybox, contained in the checkpoints.zip archive)
 ```
-python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --n_augmentation=5 --batch_size=4 -postprocessing_type=deepnet
+python3 postproc_pipeline.py --postprocessing_type=deepnet --batch_size=4
 ```
 
 ### PostProcessing / Inference with manual method 
 ```
-python3 postproc_pipeline.py --batch_size=4 -postprocessing_type=connect_roads
+python3 postproc_pipeline.py --postprocessing_type=connect_roads --batch_size=4 
 ```
 
 ### PostProcessing / Inference without pretrained weights (this will train a Unet from scratch with inference data from SegFormer to do automatic post-processing)
-Note that this is quite GPU heavy as it required to load the weights of SegFormer in memory
+Note that this is quite GPU heavy as it requires to load the weights of SegFormer in memory
 ```
-python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --n_augmentation=5 --batch_size=4 -postprocessing_type=deepnet --refinement_training
+python3 postproc_pipeline.py --postprocessing_type=deepnet --refinement_training --n_epochs=100 --early_stopping_threshold=10 --n_augmentation=5 --batch_size=4
 ```

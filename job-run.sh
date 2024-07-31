@@ -25,6 +25,6 @@ cd /home/$USERNAME/CIL_RoadSegmentation
 
 #### put python commands here
 
-python main.py
+python3 postproc_pipeline.py --postprocessing_type=deepnet --batch_size=4
 
 echo "finished"
