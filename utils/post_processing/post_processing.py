@@ -5,20 +5,21 @@ import torch.nn.functional as F
 from torch import nn
 from torch.nn import MaxPool2d
 
-DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
-
-
 class PostProcessing:
-
-    def __init__(self, postprocessing_patch_size=16):
+    def __init__(self, device, postprocessing_patch_size=16):
         self.postprocessing_patch_size = postprocessing_patch_size
+        self.device = device
 
     '''
     Private method refer to connect_roads for documentation
     '''
 
-    @staticmethod
-    def _connect_road(self, mask_labeled_roads, max_dist, min_group_size, fat):
+    def _connect_road(self, 
+                      mask_labeled_roads, 
+                      max_dist, 
+                      min_group_size, 
+                      fat):
+        print(mask_labeled_roads)
         # this method get a image where each pixel has a group id from which he is part
         unique_labels = torch.unique(mask_labeled_roads, sorted=False,
                                      return_inverse=False)  # we get the list of group's labels
@@ -52,14 +53,14 @@ class PostProcessing:
                         min_group_coord2 = group2[j]
             if current_min <= max_dist:  # group are within max distance threshold from each other and thus a path can be created between them else this postprocessing method bascially consider the pair already together (merge the group without creating a path between them
                 new_road_points = self.__cordinates_between_points(min_group_coord1, min_group_coord2, fat=fat).to(
-                    DEVICE)  # create a path of width fat between the two closest's group's points
+                    self.device)  # create a path of width fat between the two closest's group's points
                 subnetworks[min_group_id1] = torch.cat([subnetworks[min_group_id1], new_road_points])
             subnetworks[min_group_id1] = torch.cat([subnetworks[min_group_id1], subnetworks[
                 min_group_id2]])  # consider the two closest group as one big unity
             subnetworks.pop(min_group_id2)
 
         #convert coordinates to mask
-        mask_connect_road = torch.zeros(mask_labeled_roads.shape).to(DEVICE)
+        mask_connect_road = torch.zeros(mask_labeled_roads.shape).to(self.device)
         for subnetwork in subnetworks:
             for point in subnetwork.long():
                 if point[0] < 0 or point[0] >= mask_connect_road.shape[0] or point[1] < 0 or point[1] >= \
@@ -72,18 +73,20 @@ class PostProcessing:
     Following the principle of Bresenham's line algorithm
     '''
 
-    @staticmethod
-    def __cordinates_between_points(self, p1, p2, fat=0):
+    def __cordinates_between_points(self, 
+                                    p1, 
+                                    p2, 
+                                    fat=0):
         # added principe of kernel for each newly added point we add all point around it in a window of size 'fat'
         if fat == 0:
-            fat_kernel = torch.tensor([[0, 0]]).to(DEVICE)
+            fat_kernel = torch.tensor([[0, 0]]).to(self.device)
         else:
-            fat_kernel = torch.tensor([[i, j] for i in range(-fat, fat) for j in range(-fat, fat)]).to(DEVICE)
+            fat_kernel = torch.tensor([[i, j] for i in range(-fat, fat) for j in range(-fat, fat)]).to(self.device)
 
         x1, y1 = p1[0].item(), p1[1].item()
         x2, y2 = p2[0].item(), p2[1].item()
 
-        result_coordinate = torch.empty((0, 2)).to(DEVICE)
+        result_coordinate = torch.empty((0, 2)).to(self.device)
 
         dx, dy = abs(x2 - x1), abs(y2 - y1)
         step_x = 1 if x1 < x2 else -1
@@ -107,10 +110,10 @@ class PostProcessing:
                 break  # avoid writing the end coordinate
 
             #result_coordinate = torch.cat([result_coordinate, torch.tensor([[x1, y1]])])
-            result_coordinate = torch.cat([result_coordinate, fat_kernel + torch.tensor([x1, y1]).to(DEVICE)])
+            result_coordinate = torch.cat([result_coordinate, fat_kernel + torch.tensor([x1, y1]).to(self.device)])
             result_coordinate = torch.unique(result_coordinate, sorted=False, return_inverse=False, return_counts=False,
                                              dim=0)
-        return result_coordinate.to(DEVICE)
+        return result_coordinate.to(self.device)
 
     '''
     All patch around are part of a road 
@@ -125,8 +128,12 @@ class PostProcessing:
     @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
 
-    @staticmethod
-    def connect_roads(self, mask_connect_roads, downsample=2, max_dist=25, min_group_size=1, threshold_road_not_road=0,
+    def connect_roads(self, 
+                      mask_connect_roads, 
+                      downsample=2, 
+                      max_dist=25, 
+                      min_group_size=1, 
+                      threshold_road_not_road=0,
                       fat=2):
         assert min_group_size >= 1 and max_dist >= 1 and downsample >= 1
         # downsample the predicted mask
@@ -143,7 +150,7 @@ class PostProcessing:
         # give each road pixel a label
         labels = torch.arange(1, (height + 2) * (width + 2) + 1, dtype=torch.int32).reshape(height + 2,
                                                                                             width + 2).repeat(
-            batch_size, 1, 1, 1).to(DEVICE) * mask_connect_roads_padded
+            batch_size, 1, 1, 1).to(self.device) * mask_connect_roads_padded
 
         #iterate until all touching pixel of road have the same value -> propagate the smalll label to all pixel touching (end with all pixel being part of the same group having the same value
         while True:
@@ -158,7 +165,7 @@ class PostProcessing:
             labels = new_labels
 
         # process each mask of the batch separately (GPU memory constraints)
-        result = torch.empty((0, 1, height, width)).to(DEVICE)
+        result = torch.empty((0, 1, height, width)).to(self.device)
         for i in range(batch_size):
             connected_mask = self._connect_road(labels[i, 0, :, :], max_dist, min_group_size, fat).unsqueeze(
                 0).unsqueeze(0)
@@ -177,8 +184,10 @@ class PostProcessing:
     @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
 
-    @staticmethod
-    def mask_connected_though_border_radius(mask_connect_roads, downsample=2, contact_radius=3,
+    def mask_connected_though_border_radius(self,
+                                            mask_connect_roads, 
+                                            downsample=2, 
+                                            contact_radius=3,
                                             threshold_road_not_road=0):
         assert contact_radius >= 1 and contact_radius % 2 == 1 and downsample >= 1
         negative_confidence, positive_confidence = mask_connect_roads.min().item(), mask_connect_roads.max().item()
@@ -211,8 +220,9 @@ class PostProcessing:
 
         return mask_connect_roads_padded
 
-    @staticmethod
-    def blurring_averaging(self, mask_connect_roads, kernel_size=7):
+    def blurring_averaging(self, 
+                           mask_connect_roads, 
+                           kernel_size=7):
         assert kernel_size % 2 == 1
         m = nn.AvgPool2d(kernel_size, stride=1, padding=(kernel_size - 1) // 2)
         mask_connect_roads_blurred = m(mask_connect_roads)
@@ -226,8 +236,11 @@ class PostProcessing:
     @param threshold_road_not_road : value at which we consider the confidence of the model to be prediciting a road
     '''
 
-    @staticmethod
-    def connect_all_close_pixels(self, mask_connect_roads, downsample=2, distance_max=10, threshold_road_not_road=0):
+    def connect_all_close_pixels(self, 
+                                 mask_connect_roads, 
+                                 downsample=2, 
+                                 distance_max=10, 
+                                 threshold_road_not_road=0):
         assert distance_max >= 1 and downsample >= 1
         # downsample the predicted mask
         m = nn.AvgPool2d(downsample, stride=downsample)
@@ -236,7 +249,7 @@ class PostProcessing:
         height = mask_connect_roads.shape[2]
         width = mask_connect_roads.shape[3]
 
-        result = torch.zeros((0, 1, height, width)).to(DEVICE)
+        result = torch.zeros((0, 1, height, width)).to(self.device)
 
         # process batch sample individually (GPU memory constraints)
         for b in range(batch_size):
@@ -244,7 +257,7 @@ class PostProcessing:
             road_coordinates = mask_connect_road.nonzero(
                 as_tuple=False).float()  # extract coordinate of all road pixels
 
-            acc_result = torch.empty((0, 2)).to(DEVICE)
+            acc_result = torch.empty((0, 2)).to(self.device)
             acc_result = torch.cat([acc_result, road_coordinates], dim=0)
             # for each pixel predicted as part of a road
             for road_coordinate in road_coordinates:
@@ -261,7 +274,7 @@ class PostProcessing:
                     acc_result = torch.cat([acc_result, added_coordinates], dim=0)
             acc_result = torch.unique(acc_result, sorted=False, return_inverse=False, return_counts=False, dim=0) # keep only unique pixels
 
-            mask_connect_road = torch.zeros(mask_connect_road.shape).to(DEVICE)
+            mask_connect_road = torch.zeros(mask_connect_road.shape).to(self.device)
             for point in acc_result.long(): # convert list of road pixels back to mask
                 mask_connect_road[point[0], point[1]] = 1
 
