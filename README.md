@@ -61,7 +61,6 @@ cd CIL_RoadSegmentation/
 ```
 dataset -> CIL_RoadSegmentation
 checkpoints -> CIL_RoadSegmentation
-refinement_finetuned.pth -> utils/models
 ```
 2. Install dependencies
 
@@ -77,18 +76,18 @@ pip install -r utils/env_setup/requirements.txt
 ## Run
 ### Training of the SegFormer model
 ```
-python3 main.py --n_epochs=100 --n_augmentation=4 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer"
+python3 main.py --n_folds=5 --use_lr_scheduler --loss=diceloss --batch_size=4 --n_epochs=100 --use_transforms --n_augmentation=10 --early_stopping_threshold=10
 ```
 
 This will give you a set of checkpoints weights that can be reused to perform post-processing if wanted. To further perform post-processing, you have to first select which checkpoint folder created by the SegFormer training you want to use for postprocessing and change it in the main call of the processing pipeline along with the selected epochs.
 
 ### PostProcessing / Inference with pretrained weights (downloadable from the polybox under refinement_pretrained.pth)
 ```
-python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=4 --debug=True --model="segformer" --refinement=True --postProcessingAlgo="deepRefinement"
+python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --n_augmentation=5 --batch_size=4 -postprocessing_type=deepnet
 ```
 
 ### PostProcessing / Inference without pretrained weights (this will train a Unet from scratch with inference data from SegFormer to do automatic post-processing)
-Note that this is quite GPU heavy and was run on google colab with at least a 24GB GPU
+Note that this is quite GPU heavy as it required to load the weights of SegFormer in memory
 ```
-python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --batch_size=2 --debug=True --model="segformer" --refinement=True --refinement_training=True
+python3 postproc_pipeline.py --n_epochs=100 --early_stopping_threshold=10 --n_augmentation=5 --batch_size=4 -postprocessing_type=deepnet --refinement_training
 ```
