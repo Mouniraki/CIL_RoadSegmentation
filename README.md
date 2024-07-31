@@ -35,7 +35,7 @@ File structure of principal parts:
     │     └── rotation.py           -> Class used to rotate randomly the training images (Data augmentation)
     ├── losses
     │ ├── loss.py                   -> Implements the losses used in the training loop
-    ├── metrics.py                  -> Implement the method used to compute the metrics : patch_accuracy_fn / precision_fn / recall_fn / f1_fn / patch_f1_fn /                                             iou_fn 
+    ├── metrics.py                  -> Implement the method used to compute the metrics : patch_accuracy_fn / precision_fn / recall_fn / f1_fn / patch_f1_fn / iou_fn 
     ├── models
     │ ├── segformer.py              -> Define our model with the configuration adapted to the task of road segmentation
     │ └── unet.py                   -> Define a unet model, used in our initial testing based on the code furnished by the teaching team and used in the deep postprocessing model
