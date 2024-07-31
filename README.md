@@ -7,9 +7,9 @@
 File structure of principal parts:      
 
 ```
-├── checkpoints
-│ └── 23-07-2024_14-51-05           -> Contain the weights of our best model
-│ │ └── description.txt             -> describe the parameters used in training for each specific checkpoints
+├── checkpoints                     -> Can be downloaded from TODO
+│ └── segformer                     -> Contain the weights of our best raw model
+| └── postprocessing                -> Contain the weights of our best postprocessing model
 ├── dataset                         -> Can be downloaded from TODO
 │ ├── test
 │ │ └── images
