@@ -7,10 +7,10 @@
 File structure of principal parts:      
 
 ```
-├── checkpoints                     -> Can be downloaded from TODO
+├── checkpoints                     -> See the "Getting started" to learn more
 │ └── segformer                     -> Contain the weights of our best raw model
 | └── postprocessing                -> Contain the weights of our best postprocessing model
-├── dataset                         -> Can be downloaded from TODO
+├── dataset                         -> See the "Getting started" to learn more
 │ ├── test
 │ │ └── images
 │ └── training
